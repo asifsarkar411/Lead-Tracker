@@ -27,7 +27,8 @@ export default function Sidebar({ mobileOpen, onCloseMobile }) {
     clients, 
     demoLinks,
     successfulClients,
-    totalNoticeCount 
+    totalNoticeCount,
+    settings
   } = useApp();
 
   const [isClientListOpen, setIsClientListOpen] = useState(true);
@@ -57,12 +58,43 @@ export default function Sidebar({ mobileOpen, onCloseMobile }) {
 
       {/* Sidebar container */}
       <aside 
-        className={`fixed lg:sticky top-16 left-0 z-40 h-[calc(100vh-4rem)] w-64 flex-shrink-0 bg-white/95 dark:bg-slate-900/95 border-r border-slate-200 dark:border-slate-800 p-4 transition-transform duration-200 ease-in-out lg:translate-x-0 ${
-          mobileOpen ? 'translate-x-0' : '-translate-x-full'
+        className={`fixed lg:sticky top-0 lg:top-16 left-0 z-50 lg:z-40 h-screen lg:h-[calc(100vh-4rem)] w-72 lg:w-64 flex-shrink-0 bg-white/95 dark:bg-slate-900/95 border-r border-slate-200 dark:border-slate-800 p-4 transition-transform duration-200 ease-in-out lg:translate-x-0 ${
+          mobileOpen ? 'translate-x-0 shadow-2xl' : '-translate-x-full'
         } flex flex-col justify-between`}
       >
         <div className="space-y-1.5 overflow-y-auto">
-          <div className="px-3 py-2 text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+          {/* Mobile Drawer Header with Logo & Close Button */}
+          <div className="lg:hidden flex items-center justify-between pb-3 mb-2 border-b border-slate-100 dark:border-slate-800">
+            <div className="flex items-center gap-2">
+              {settings.logoUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img 
+                  src={settings.logoUrl} 
+                  alt={settings.siteName || 'Logo'} 
+                  className="max-h-8 max-w-[100px] object-contain rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-0.5"
+                />
+              ) : (
+                <div className="w-8 h-8 rounded-lg bg-emerald-600 flex items-center justify-center text-white font-bold text-xs">
+                  ৳
+                </div>
+              )}
+              <div>
+                <span className="font-bold text-xs text-slate-900 dark:text-white block truncate max-w-[140px]">
+                  {settings.siteName || 'Lead Tracker'}
+                </span>
+                <span className="text-[10px] text-slate-400">Agency CRM</span>
+              </div>
+            </div>
+            <button
+              onClick={onCloseMobile}
+              className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+              title="Close menu"
+            >
+              ✕
+            </button>
+          </div>
+
+          <div className="px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
             Agency Navigation
           </div>
 

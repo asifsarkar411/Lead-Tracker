@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import Navbar from '@/components/Navbar';
 import Sidebar from '@/components/Sidebar';
 import AdminSettingsView from '@/components/AdminSettingsView';
+import MobileBottomNav from '@/components/MobileBottomNav';
 
 export default function AdminPage() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -18,10 +19,12 @@ export default function AdminPage() {
           onCloseMobile={() => setMobileMenuOpen(false)} 
         />
 
-        <main className="flex-1 p-4 sm:p-6 lg:p-8 min-w-0 overflow-y-auto">
+        <main className="flex-1 p-3 sm:p-6 lg:p-8 min-w-0 overflow-y-auto pb-24 lg:pb-8">
           <AdminSettingsView />
         </main>
       </div>
+
+      <MobileBottomNav />
     </div>
   );
 }

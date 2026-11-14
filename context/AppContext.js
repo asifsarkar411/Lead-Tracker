@@ -76,7 +76,7 @@ export function AppProvider({ children }) {
     }
   }, []);
 
-  // Theme synchronization
+  // Theme & Settings synchronization from localStorage for instant 0ms load
   useEffect(() => {
     const savedTheme = localStorage.getItem('lead_tracker_theme') || 'dark';
     setTheme(savedTheme);
@@ -85,7 +85,37 @@ export function AppProvider({ children }) {
     } else {
       document.documentElement.classList.remove('dark');
     }
+
+    const cachedSettings = localStorage.getItem('lead_tracker_settings_cache');
+    if (cachedSettings) {
+      try {
+        const parsed = JSON.parse(cachedSettings);
+        if (parsed && typeof parsed === 'object') {
+          setSettings(prev => ({ ...prev, ...parsed }));
+        }
+      } catch (e) {
+        console.warn('Error reading cached settings:', e);
+      }
+    }
   }, []);
+
+  // Update browser tab title and dynamic favicon when website name or logo changes
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      if (settings?.siteName) {
+        document.title = `${settings.siteName} | ${settings.tagline || 'Sales & Lead Tracker'}`;
+      }
+      if (settings?.logoUrl) {
+        let link = document.querySelector("link[rel*='icon']");
+        if (!link) {
+          link = document.createElement('link');
+          link.rel = 'shortcut icon';
+          document.head.appendChild(link);
+        }
+        link.href = settings.logoUrl;
+      }
+    }
+  }, [settings?.siteName, settings?.tagline, settings?.logoUrl]);
 
   const toggleTheme = () => {
     const nextTheme = theme === 'dark' ? 'light' : 'dark';
@@ -120,6 +150,7 @@ export function AppProvider({ children }) {
       const data = await res.json();
       if (data.success && data.settings) {
         setSettings(data.settings);
+        localStorage.setItem('lead_tracker_settings_cache', JSON.stringify(data.settings));
         if (data.status) setDbStatus(data.status);
       }
     } catch (e) {
@@ -495,6 +526,10 @@ export function AppProvider({ children }) {
   // Update Settings
   const saveSettings = async (newSettings) => {
     try {
+      // Optimistic update
+      setSettings(prev => ({ ...prev, ...newSettings }));
+      localStorage.setItem('lead_tracker_settings_cache', JSON.stringify(newSettings));
+
       const res = await fetch('/api/settings', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -503,6 +538,7 @@ export function AppProvider({ children }) {
       const result = await res.json();
       if (result.success) {
         setSettings(result.settings);
+        localStorage.setItem('lead_tracker_settings_cache', JSON.stringify(result.settings));
         if (result.status) setDbStatus(result.status);
         return { success: true };
       }

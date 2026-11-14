@@ -23,7 +23,8 @@ import {
   Star,
   Copy,
   MapPin,
-  Globe
+  Globe,
+  LayoutGrid
 } from 'lucide-react';
 
 export default function OutreachView() {
@@ -41,6 +42,7 @@ export default function OutreachView() {
   const [filterPriority, setFilterPriority] = useState('All');
   const [filterFollowStatus, setFilterFollowStatus] = useState('All');
   const [filterContacted, setFilterContacted] = useState('All');
+  const [viewMode, setViewMode] = useState('table'); // 'table' | 'cards'
 
   // Modals
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
@@ -304,6 +306,32 @@ export default function OutreachView() {
 
         {/* Action Controls */}
         <div className="flex flex-wrap items-center gap-2">
+          {/* View Mode Switcher */}
+          <div className="flex items-center bg-slate-100 dark:bg-slate-800 p-1 rounded-xl">
+            <button
+              onClick={() => setViewMode('table')}
+              className={`p-1.5 rounded-lg text-xs font-semibold transition-all ${
+                viewMode === 'table'
+                  ? 'bg-white dark:bg-slate-900 text-indigo-600 shadow-sm'
+                  : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
+              }`}
+              title="Spreadsheet Table View"
+            >
+              <FileSpreadsheet className="w-4 h-4" />
+            </button>
+            <button
+              onClick={() => setViewMode('cards')}
+              className={`p-1.5 rounded-lg text-xs font-semibold transition-all ${
+                viewMode === 'cards'
+                  ? 'bg-white dark:bg-slate-900 text-indigo-600 shadow-sm'
+                  : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
+              }`}
+              title="Mobile Cards View"
+            >
+              <LayoutGrid className="w-4 h-4" />
+            </button>
+          </div>
+
           {/* Export Excel (.xlsx) */}
           <button
             onClick={handleExportExcel}
@@ -442,238 +470,456 @@ export default function OutreachView() {
         </div>
       </div>
 
-      {/* Excel-like Table View */}
-      <div className="rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
-        <div className="overflow-x-auto max-h-[700px]">
-          <table className="w-full text-left border-collapse">
-            <thead className="sticky top-0 z-10 bg-slate-100/95 dark:bg-slate-800/95 backdrop-blur-md text-[11px] font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400 border-b border-slate-200 dark:border-slate-700">
-              <tr>
-                <th className="py-3 px-3 w-10 text-center">#</th>
-                <th className="py-3 px-4 min-w-[200px]">Business</th>
-                <th className="py-3 px-4 min-w-[150px]">Phone / WhatsApp</th>
-                <th className="py-3 px-3.5 min-w-[140px]">Category</th>
-                <th className="py-3 px-3.5 min-w-[110px]">Contacted</th>
-                <th className="py-3 px-3.5 min-w-[120px]">Priority / Temp</th>
-                <th className="py-3 px-3.5 min-w-[130px]">Follow-Up Status</th>
-                <th className="py-3 px-4 min-w-[220px]">1st Follow-Up Update</th>
-                <th className="py-3 px-3.5 min-w-[130px]">Proposal Status</th>
-                <th className="py-3 px-4 min-w-[220px]">Audit / Problems Found</th>
-                <th className="py-3 px-4 text-right min-w-[140px]">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 text-xs">
-              {filteredList.length === 0 ? (
+      {/* View Mode: Spreadsheet Table or Mobile App Cards */}
+      {viewMode === 'table' ? (
+        <div className="rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
+          <div className="overflow-x-auto max-h-[700px]">
+            <table className="w-full text-left border-collapse">
+              <thead className="sticky top-0 z-10 bg-slate-100/95 dark:bg-slate-800/95 backdrop-blur-md text-[11px] font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400 border-b border-slate-200 dark:border-slate-700">
                 <tr>
-                  <td colSpan={11} className="py-16 text-center text-slate-400">
-                    <div className="max-w-sm mx-auto space-y-2">
-                      <FileSpreadsheet className="w-10 h-10 mx-auto opacity-50 text-indigo-500" />
-                      <h4 className="font-bold text-slate-700 dark:text-slate-300">No Outreach Leads Found</h4>
-                      <p className="text-xs text-slate-500">
-                        Click &quot;Import Excel / CSV&quot; to import your November Outreach workbook.
-                      </p>
-                    </div>
-                  </td>
+                  <th className="py-3 px-3 w-10 text-center">#</th>
+                  <th className="py-3 px-4 min-w-[200px]">Business</th>
+                  <th className="py-3 px-4 min-w-[150px]">Phone / WhatsApp</th>
+                  <th className="py-3 px-3.5 min-w-[140px]">Category</th>
+                  <th className="py-3 px-3.5 min-w-[110px]">Contacted</th>
+                  <th className="py-3 px-3.5 min-w-[120px]">Priority / Temp</th>
+                  <th className="py-3 px-3.5 min-w-[130px]">Follow-Up Status</th>
+                  <th className="py-3 px-4 min-w-[220px]">1st Follow-Up Update</th>
+                  <th className="py-3 px-3.5 min-w-[130px]">Proposal Status</th>
+                  <th className="py-3 px-4 min-w-[220px]">Audit / Problems Found</th>
+                  <th className="py-3 px-4 text-right min-w-[140px]">Actions</th>
                 </tr>
-              ) : (
-                filteredList.map((item, idx) => {
-                  const isContacted = item.contacted === 'Yes';
-                  const isHot = item.temperature === 'Hot' || item.priority === 'High';
-                  const isWarm = item.temperature === 'Warm' || item.priority === 'Medium';
+              </thead>
+              <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 text-xs">
+                {filteredList.length === 0 ? (
+                  <tr>
+                    <td colSpan={11} className="py-16 text-center text-slate-400">
+                      <div className="max-w-sm mx-auto space-y-2">
+                        <FileSpreadsheet className="w-10 h-10 mx-auto opacity-50 text-indigo-500" />
+                        <h4 className="font-bold text-slate-700 dark:text-slate-300">No Outreach Leads Found</h4>
+                        <p className="text-xs text-slate-500">
+                          Click &quot;Import Excel / CSV&quot; to import your November Outreach workbook.
+                        </p>
+                      </div>
+                    </td>
+                  </tr>
+                ) : (
+                  filteredList.map((item, idx) => {
+                    const isContacted = item.contacted === 'Yes';
+                    const isHot = item.temperature === 'Hot' || item.priority === 'High';
+                    const isWarm = item.temperature === 'Warm' || item.priority === 'Medium';
 
-                  return (
-                    <tr 
-                      key={item._id || idx}
-                      className="hover:bg-slate-50/90 dark:hover:bg-slate-800/50 transition-colors"
-                    >
-                      {/* # */}
-                      <td className="py-3 px-3 text-center text-slate-400 font-mono text-[11px]">
-                        {idx + 1}
-                      </td>
+                    return (
+                      <tr 
+                        key={item._id || idx}
+                        className="hover:bg-slate-50/90 dark:hover:bg-slate-800/50 transition-colors"
+                      >
+                        {/* # */}
+                        <td className="py-3 px-3 text-center text-slate-400 font-mono text-[11px]">
+                          {idx + 1}
+                        </td>
 
-                      {/* Business */}
-                      <td className="py-3 px-4">
-                        <div className="font-bold text-slate-900 dark:text-white">
-                          {item.business || item.name}
-                        </div>
-                        <div className="flex items-center gap-2 mt-0.5 text-[10px] text-slate-400">
-                          {item.address && (
-                            <span className="truncate max-w-[160px]" title={item.address}>
-                              📍 {item.address}
-                            </span>
+                        {/* Business */}
+                        <td className="py-3 px-4">
+                          <div className="font-bold text-slate-900 dark:text-white">
+                            {item.business || item.name}
+                          </div>
+                          <div className="flex items-center gap-2 mt-0.5 text-[10px] text-slate-400">
+                            {item.address && (
+                              <span className="truncate max-w-[160px]" title={item.address}>
+                                📍 {item.address}
+                              </span>
+                            )}
+                            {item.rating && (
+                              <span className="font-semibold text-amber-500">
+                                ★ {item.rating} ({item.reviews || 0})
+                              </span>
+                            )}
+                          </div>
+                        </td>
+
+                        {/* Phone / WhatsApp */}
+                        <td className="py-3 px-4 font-mono">
+                          {item.phone ? (
+                            <div className="flex items-center gap-1.5">
+                              <button
+                                onClick={() => handleOpenWhatsApp(item.phone, item.business)}
+                                className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-semibold bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 hover:bg-emerald-100 transition-colors"
+                                title="Open WhatsApp chat"
+                              >
+                                <Phone className="w-3 h-3 text-emerald-500" />
+                                <span>{item.phone}</span>
+                              </button>
+                              <button
+                                onClick={() => handleCopy(item.phone, item._id)}
+                                className="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                                title="Copy number"
+                              >
+                                <Copy className="w-3 h-3" />
+                              </button>
+                            </div>
+                          ) : (
+                            <span className="text-slate-400 italic">No Phone</span>
                           )}
-                          {item.rating && (
-                            <span className="font-semibold text-amber-500">
-                              ★ {item.rating} ({item.reviews || 0})
-                            </span>
-                          )}
-                        </div>
-                      </td>
+                        </td>
 
-                      {/* Phone / WhatsApp */}
-                      <td className="py-3 px-4 font-mono">
-                        {item.phone ? (
-                          <div className="flex items-center gap-1.5">
+                        {/* Category */}
+                        <td className="py-3 px-3.5">
+                          <span className="inline-block px-2 py-0.5 rounded-lg text-[10px] font-bold bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300">
+                            {item.category || item.batchTag || 'General'}
+                          </span>
+                        </td>
+
+                        {/* Contacted (In-cell toggle) */}
+                        <td className="py-3 px-3.5">
+                          <select
+                            value={item.contacted || 'No'}
+                            onChange={(e) => handleQuickUpdate(item._id, 'contacted', e.target.value)}
+                            className={`px-2 py-1 text-[11px] font-bold rounded-xl border cursor-pointer ${
+                              isContacted
+                                ? 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950 dark:text-emerald-300'
+                                : 'bg-slate-50 text-slate-600 border-slate-200 dark:bg-slate-800 dark:text-slate-400'
+                            }`}
+                          >
+                            <option value="No">No</option>
+                            <option value="Yes">Yes</option>
+                          </select>
+                        </td>
+
+                        {/* Priority / Temperature */}
+                        <td className="py-3 px-3.5">
+                          <div className="flex items-center gap-1">
+                            <span className={`inline-flex items-center gap-0.5 px-2 py-0.5 rounded-md text-[10px] font-bold ${
+                              isHot 
+                                ? 'bg-rose-50 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300'
+                                : isWarm
+                                ? 'bg-amber-50 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300'
+                                : 'bg-blue-50 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300'
+                            }`}>
+                              {isHot ? <Flame className="w-2.5 h-2.5 text-rose-500" /> : <Zap className="w-2.5 h-2.5 text-amber-500" />}
+                              <span>{item.temperature || item.priority || 'Warm'}</span>
+                            </span>
+                            {item.opportunityScore && (
+                              <span className="text-[10px] font-mono font-bold text-slate-500">
+                                {item.opportunityScore}pt
+                              </span>
+                            )}
+                          </div>
+                        </td>
+
+                        {/* Follow-up Status */}
+                        <td className="py-3 px-3.5">
+                          <select
+                            value={item.followUpStatus || 'Not started'}
+                            onChange={(e) => handleQuickUpdate(item._id, 'followUpStatus', e.target.value)}
+                            className="px-2 py-1 text-[11px] font-semibold rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 cursor-pointer"
+                          >
+                            <option value="Not started">Not started</option>
+                            <option value="In progress">In progress</option>
+                            <option value="Completed">Completed</option>
+                          </select>
+                        </td>
+
+                        {/* 1st Follow-Up Update */}
+                        <td className="py-3 px-4">
+                          <span className="text-[11px] text-slate-700 dark:text-slate-300 line-clamp-2 max-w-xs" title={item.firstFollowUp}>
+                            {item.firstFollowUp || '-'}
+                          </span>
+                        </td>
+
+                        {/* Proposal Status */}
+                        <td className="py-3 px-3.5">
+                          <select
+                            value={item.proposalSentStatus || 'Not sent'}
+                            onChange={(e) => handleQuickUpdate(item._id, 'proposalSentStatus', e.target.value)}
+                            className="px-2 py-1 text-[11px] font-semibold rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 cursor-pointer"
+                          >
+                            <option value="Not sent">Not sent</option>
+                            <option value="Drafted">Drafted</option>
+                            <option value="Sent">Sent</option>
+                            <option value="Accepted">Accepted</option>
+                            <option value="Rejected">Rejected</option>
+                          </select>
+                        </td>
+
+                        {/* Audit / Problems Found */}
+                        <td className="py-3 px-4">
+                          <div className="text-[10px] text-slate-600 dark:text-slate-400 line-clamp-2 max-w-xs whitespace-pre-line" title={item.problemsFound}>
+                            {item.problemsFound || 'No audit notes'}
+                          </div>
+                        </td>
+
+                        {/* Actions */}
+                        <td className="py-3 px-4 text-right">
+                          <div className="flex items-center justify-end gap-1">
+                            {item.googleMaps && (
+                              <a
+                                href={item.googleMaps}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="p-1.5 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/50 rounded-lg transition-colors"
+                                title="Open Google Maps link"
+                              >
+                                <MapPin className="w-3.5 h-3.5" />
+                              </a>
+                            )}
                             <button
-                              onClick={() => handleOpenWhatsApp(item.phone, item.business)}
-                              className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-semibold bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 hover:bg-emerald-100 transition-colors"
-                              title="Open WhatsApp chat"
+                              onClick={() => setActiveOutreachForNotes(item)}
+                              className="p-1.5 text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 rounded-lg transition-colors"
+                              title="Notes & Multi Follow-ups"
                             >
-                              <Phone className="w-3 h-3 text-emerald-500" />
-                              <span>{item.phone}</span>
+                              <MessageSquare className="w-3.5 h-3.5" />
                             </button>
                             <button
-                              onClick={() => handleCopy(item.phone, item._id)}
-                              className="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
-                              title="Copy number"
+                              onClick={() => convertToClient({
+                                name: item.business || item.name,
+                                phone: item.phone,
+                                services: ['Website Development', 'SEO']
+                              })}
+                              className="p-1.5 text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950/50 rounded-lg transition-colors"
+                              title="Convert to Won Client"
                             >
-                              <Copy className="w-3 h-3" />
+                              <UserCheck className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              onClick={() => {
+                                if (confirm(`Delete outreach lead "${item.business || item.name}"?`)) {
+                                  removeOutreachLead(item._id);
+                                }
+                              }}
+                              className="p-1.5 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/50 rounded-lg transition-colors"
+                              title="Delete Lead"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
                             </button>
                           </div>
-                        ) : (
-                          <span className="text-slate-400 italic">No Phone</span>
-                        )}
-                      </td>
+                        </td>
 
-                      {/* Category */}
-                      <td className="py-3 px-3.5">
-                        <span className="inline-block px-2 py-0.5 rounded-lg text-[10px] font-bold bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300">
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      ) : (
+        /* Mobile App Card Grid View */
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {filteredList.length === 0 ? (
+            <div className="col-span-full py-16 text-center text-slate-400 bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800">
+              <FileSpreadsheet className="w-10 h-10 mx-auto opacity-50 text-indigo-500 mb-2" />
+              <h4 className="font-bold text-slate-700 dark:text-slate-300">No Outreach Leads Found</h4>
+              <p className="text-xs text-slate-500">
+                Click &quot;Import Excel / CSV&quot; to import your November Outreach workbook.
+              </p>
+            </div>
+          ) : (
+            filteredList.map((item, idx) => {
+              const isContacted = item.contacted === 'Yes';
+              const isHot = item.temperature === 'Hot' || item.priority === 'High';
+              const isWarm = item.temperature === 'Warm' || item.priority === 'Medium';
+
+              return (
+                <div
+                  key={item._id || idx}
+                  className="p-4 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm hover:shadow-md transition-shadow space-y-3"
+                >
+                  {/* Header */}
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono text-[10px] text-slate-400">#{idx + 1}</span>
+                        <h3 className="font-bold text-sm text-slate-900 dark:text-white truncate">
+                          {item.business || item.name}
+                        </h3>
+                      </div>
+                      <div className="flex flex-wrap items-center gap-1.5 mt-1">
+                        <span className="inline-block px-2 py-0.5 rounded-md text-[10px] font-bold bg-indigo-50 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300">
                           {item.category || item.batchTag || 'General'}
                         </span>
-                      </td>
-
-                      {/* Contacted (In-cell toggle) */}
-                      <td className="py-3 px-3.5">
-                        <select
-                          value={item.contacted || 'No'}
-                          onChange={(e) => handleQuickUpdate(item._id, 'contacted', e.target.value)}
-                          className={`px-2 py-1 text-[11px] font-bold rounded-xl border cursor-pointer ${
-                            isContacted
-                              ? 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950 dark:text-emerald-300'
-                              : 'bg-slate-50 text-slate-600 border-slate-200 dark:bg-slate-800 dark:text-slate-400'
-                          }`}
-                        >
-                          <option value="No">No</option>
-                          <option value="Yes">Yes</option>
-                        </select>
-                      </td>
-
-                      {/* Priority / Temperature */}
-                      <td className="py-3 px-3.5">
-                        <div className="flex items-center gap-1">
-                          <span className={`inline-flex items-center gap-0.5 px-2 py-0.5 rounded-md text-[10px] font-bold ${
-                            isHot 
-                              ? 'bg-rose-50 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300'
-                              : isWarm
-                              ? 'bg-amber-50 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300'
-                              : 'bg-blue-50 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300'
-                          }`}>
-                            {isHot ? <Flame className="w-2.5 h-2.5 text-rose-500" /> : <Zap className="w-2.5 h-2.5 text-amber-500" />}
-                            <span>{item.temperature || item.priority || 'Warm'}</span>
-                          </span>
-                          {item.opportunityScore && (
-                            <span className="text-[10px] font-mono font-bold text-slate-500">
-                              {item.opportunityScore}pt
-                            </span>
-                          )}
-                        </div>
-                      </td>
-
-                      {/* Follow-up Status */}
-                      <td className="py-3 px-3.5">
-                        <select
-                          value={item.followUpStatus || 'Not started'}
-                          onChange={(e) => handleQuickUpdate(item._id, 'followUpStatus', e.target.value)}
-                          className="px-2 py-1 text-[11px] font-semibold rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 cursor-pointer"
-                        >
-                          <option value="Not started">Not started</option>
-                          <option value="In progress">In progress</option>
-                          <option value="Completed">Completed</option>
-                        </select>
-                      </td>
-
-                      {/* 1st Follow-Up Update */}
-                      <td className="py-3 px-4">
-                        <span className="text-[11px] text-slate-700 dark:text-slate-300 line-clamp-2 max-w-xs" title={item.firstFollowUp}>
-                          {item.firstFollowUp || '-'}
+                        <span className={`inline-flex items-center gap-0.5 px-2 py-0.5 rounded-md text-[10px] font-bold ${
+                          isHot
+                            ? 'bg-rose-50 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300'
+                            : isWarm
+                            ? 'bg-amber-50 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300'
+                            : 'bg-blue-50 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300'
+                        }`}>
+                          {isHot ? <Flame className="w-2.5 h-2.5 text-rose-500" /> : <Zap className="w-2.5 h-2.5 text-amber-500" />}
+                          <span>{item.temperature || item.priority || 'Warm'}</span>
                         </span>
-                      </td>
+                        {item.opportunityScore && (
+                          <span className="text-[10px] font-mono font-bold text-slate-500">
+                            {item.opportunityScore}pt
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => handleQuickUpdate(item._id, 'contacted', isContacted ? 'No' : 'Yes')}
+                      className={`px-2.5 py-1 rounded-full text-[10px] font-bold border transition-colors ${
+                        isContacted
+                          ? 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950 dark:text-emerald-300'
+                          : 'bg-slate-100 text-slate-600 border-slate-200 dark:bg-slate-800 dark:text-slate-400'
+                      }`}
+                    >
+                      {isContacted ? '✓ Contacted' : '○ Uncontacted'}
+                    </button>
+                  </div>
 
-                      {/* Proposal Status */}
-                      <td className="py-3 px-3.5">
-                        <select
-                          value={item.proposalSentStatus || 'Not sent'}
-                          onChange={(e) => handleQuickUpdate(item._id, 'proposalSentStatus', e.target.value)}
-                          className="px-2 py-1 text-[11px] font-semibold rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 cursor-pointer"
+                  {/* Location & Rating */}
+                  {(item.address || item.rating) && (
+                    <div className="flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400">
+                      {item.address && (
+                        <span className="truncate max-w-[200px]" title={item.address}>
+                          📍 {item.address}
+                        </span>
+                      )}
+                      {item.rating && (
+                        <span className="font-semibold text-amber-500 flex-shrink-0">
+                          ★ {item.rating} ({item.reviews || 0})
+                        </span>
+                      )}
+                    </div>
+                  )}
+
+                  {/* 1-Tap WhatsApp Launcher */}
+                  {item.phone ? (
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => handleOpenWhatsApp(item.phone, item.business)}
+                        className="flex-1 py-2 px-3 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white flex items-center justify-center gap-1.5 shadow-sm transition-all active:scale-98"
+                      >
+                        <Phone className="w-3.5 h-3.5" />
+                        <span>Chat WhatsApp: {item.phone}</span>
+                      </button>
+                      <button
+                        onClick={() => handleCopy(item.phone, item._id)}
+                        className="p-2 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                        title="Copy phone"
+                      >
+                        <Copy className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="py-2 text-center text-xs text-slate-400 italic bg-slate-50 dark:bg-slate-800/50 rounded-xl">
+                      No phone number
+                    </div>
+                  )}
+
+                  {/* Dropdowns: Follow Up & Proposal Status */}
+                  <div className="grid grid-cols-2 gap-2 text-xs">
+                    <div>
+                      <label className="text-[10px] text-slate-400 font-semibold block mb-0.5">Follow-Up Status</label>
+                      <select
+                        value={item.followUpStatus || 'Not started'}
+                        onChange={(e) => handleQuickUpdate(item._id, 'followUpStatus', e.target.value)}
+                        className="w-full px-2 py-1 text-xs font-medium rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200"
+                      >
+                        <option value="Not started">Not started</option>
+                        <option value="In progress">In progress</option>
+                        <option value="Completed">Completed</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="text-[10px] text-slate-400 font-semibold block mb-0.5">Proposal</label>
+                      <select
+                        value={item.proposalSentStatus || 'Not sent'}
+                        onChange={(e) => handleQuickUpdate(item._id, 'proposalSentStatus', e.target.value)}
+                        className="w-full px-2 py-1 text-xs font-medium rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200"
+                      >
+                        <option value="Not sent">Not sent</option>
+                        <option value="Drafted">Drafted</option>
+                        <option value="Sent">Sent</option>
+                        <option value="Accepted">Accepted</option>
+                        <option value="Rejected">Rejected</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* Audit / Follow Up Notes */}
+                  {(item.firstFollowUp || item.problemsFound) && (
+                    <div className="text-[11px] p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/40 border border-slate-100 dark:border-slate-800 space-y-1">
+                      {item.firstFollowUp && (
+                        <p className="text-slate-700 dark:text-slate-300 font-medium">
+                          <span className="font-semibold text-indigo-600">1st Follow-up: </span>
+                          {item.firstFollowUp}
+                        </p>
+                      )}
+                      {item.problemsFound && (
+                        <p className="text-slate-600 dark:text-slate-400 line-clamp-2">
+                          <span className="font-semibold text-amber-600">Audit: </span>
+                          {item.problemsFound}
+                        </p>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Action row */}
+                  <div className="flex items-center justify-between text-xs pt-2 border-t border-slate-100 dark:border-slate-800">
+                    <div className="flex items-center gap-1">
+                      {item.googleMaps && (
+                        <a
+                          href={item.googleMaps}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="p-1.5 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/50 rounded-lg transition-colors"
+                          title="Google Maps"
                         >
-                          <option value="Not sent">Not sent</option>
-                          <option value="Drafted">Drafted</option>
-                          <option value="Sent">Sent</option>
-                          <option value="Accepted">Accepted</option>
-                          <option value="Rejected">Rejected</option>
-                        </select>
-                      </td>
+                          <MapPin className="w-3.5 h-3.5" />
+                        </a>
+                      )}
+                      {item.website && (
+                        <a
+                          href={item.website}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="p-1.5 text-slate-600 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors"
+                          title="Website"
+                        >
+                          <Globe className="w-3.5 h-3.5" />
+                        </a>
+                      )}
+                      <button
+                        onClick={() => setActiveOutreachForNotes(item)}
+                        className="p-1.5 text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 rounded-lg transition-colors"
+                        title="Notes & Follow-ups"
+                      >
+                        <MessageSquare className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
 
-                      {/* Audit / Problems Found */}
-                      <td className="py-3 px-4">
-                        <div className="text-[10px] text-slate-600 dark:text-slate-400 line-clamp-2 max-w-xs whitespace-pre-line" title={item.problemsFound}>
-                          {item.problemsFound || 'No audit notes'}
-                        </div>
-                      </td>
-
-                      {/* Actions */}
-                      <td className="py-3 px-4 text-right">
-                        <div className="flex items-center justify-end gap-1">
-                          {item.googleMaps && (
-                            <a
-                              href={item.googleMaps}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="p-1.5 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/50 rounded-lg transition-colors"
-                              title="Open Google Maps link"
-                            >
-                              <MapPin className="w-3.5 h-3.5" />
-                            </a>
-                          )}
-                          <button
-                            onClick={() => setActiveOutreachForNotes(item)}
-                            className="p-1.5 text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 rounded-lg transition-colors"
-                            title="Notes & Multi Follow-ups"
-                          >
-                            <MessageSquare className="w-3.5 h-3.5" />
-                          </button>
-                          <button
-                            onClick={() => convertToClient({
-                              name: item.business || item.name,
-                              phone: item.phone,
-                              services: ['Website Development', 'SEO']
-                            })}
-                            className="p-1.5 text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950/50 rounded-lg transition-colors"
-                            title="Convert to Won Client"
-                          >
-                            <UserCheck className="w-3.5 h-3.5" />
-                          </button>
-                          <button
-                            onClick={() => {
-                              if (confirm(`Delete outreach lead "${item.business || item.name}"?`)) {
-                                removeOutreachLead(item._id);
-                              }
-                            }}
-                            className="p-1.5 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/50 rounded-lg transition-colors"
-                            title="Delete Lead"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-                      </td>
-
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => convertToClient({
+                          name: item.business || item.name,
+                          phone: item.phone,
+                          services: ['Website Development', 'SEO']
+                        })}
+                        className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-bold rounded-lg text-emerald-700 bg-emerald-50 dark:bg-emerald-950/60 dark:text-emerald-300 hover:bg-emerald-100 transition-colors"
+                      >
+                        <UserCheck className="w-3 h-3" />
+                        <span>Convert Won</span>
+                      </button>
+                      <button
+                        onClick={() => {
+                          if (confirm(`Delete "${item.business || item.name}"?`)) {
+                            removeOutreachLead(item._id);
+                          }
+                        }}
+                        className="p-1.5 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/50 rounded-lg transition-colors"
+                        title="Delete"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              );
+            })
+          )}
         </div>
-      </div>
+      )}
 
       {/* Follow-up Notes Modal */}
       {activeOutreachForNotes && (

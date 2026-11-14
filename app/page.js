@@ -13,6 +13,7 @@ import AdminSettingsView from '@/components/AdminSettingsView';
 import LeadModal from '@/components/LeadModal';
 import ClientModal from '@/components/ClientModal';
 import ReminderNoticeModal from '@/components/ReminderNoticeModal';
+import MobileBottomNav from '@/components/MobileBottomNav';
 
 export default function Home() {
   const { activeTab, setActiveTab } = useApp();
@@ -32,7 +33,7 @@ export default function Home() {
         />
 
         {/* Main Content Area */}
-        <main className="flex-1 p-4 sm:p-6 lg:p-8 min-w-0 overflow-y-auto">
+        <main className="flex-1 p-3 sm:p-6 lg:p-8 min-w-0 overflow-y-auto pb-24 lg:pb-8">
           {activeTab === 'dashboard' && <DashboardOverview />}
           {activeTab === 'leads' && <LeadsView />}
           {activeTab === 'outreach' && <OutreachView />}
@@ -54,6 +55,9 @@ export default function Home() {
           {activeTab === 'admin' && <AdminSettingsView />}
         </main>
       </div>
+
+      {/* Global Mobile Bottom Navigation (Web App PWA Feel) */}
+      <MobileBottomNav />
 
       {/* Global Interactive Modals */}
       <LeadModal />

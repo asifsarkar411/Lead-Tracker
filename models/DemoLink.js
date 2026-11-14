@@ -4,9 +4,9 @@ const DemoLinkSchema = new mongoose.Schema({
   title: { type: String, required: true },
   clientName: { type: String, default: '' },
   businessType: { type: String, default: '' },
-  category: { 
-    type: String, 
-    default: 'Web Design & Development' 
+  category: {
+    type: String,
+    default: 'Web Design & Development'
   },
   url: { type: String, required: true },
   linkType: { type: String, default: 'Frontend' }, // Frontend, Admin Panel, Store-Front, Website

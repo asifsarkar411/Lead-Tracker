@@ -78,10 +78,10 @@ export default function Navbar({ onMobileMenuToggle }) {
                 <img 
                   src={settings.logoUrl} 
                   alt={settings.siteName || 'Agency Logo'} 
-                  className="w-9 h-9 object-contain rounded-xl border border-slate-200 dark:border-slate-700 bg-white"
+                  className="max-h-9 max-w-[120px] object-contain rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-0.5 shadow-sm"
                 />
               ) : (
-                <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-emerald-600 to-teal-500 flex items-center justify-center text-white shadow-md shadow-emerald-600/20 group-hover:scale-105 transition-transform">
+                <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-emerald-600 to-teal-500 flex items-center justify-center text-white shadow-md shadow-emerald-600/20 group-hover:scale-105 transition-transform flex-shrink-0">
                   <span className="font-extrabold text-sm">৳</span>
                 </div>
               )}
