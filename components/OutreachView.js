@@ -2,6 +2,8 @@
 
 import React, { useState, useMemo } from 'react';
 import { useApp } from '@/context/AppContext';
+import DateFilterBar from './DateFilterBar';
+import { parseExcelOrCsvFile, exportToExcel, exportToCsv } from '@/lib/excelUtils';
 import { 
   FileSpreadsheet, 
   Upload, 
@@ -19,8 +21,7 @@ import {
   CheckCircle,
   AlertCircle,
   X,
-  FileUp,
-  Layers
+  FileUp
 } from 'lucide-react';
 
 export default function OutreachView() {
@@ -36,15 +37,12 @@ export default function OutreachView() {
   const [search, setSearch] = useState('');
   const [filterPotential, setFilterPotential] = useState('All');
   const [filterMeeting, setFilterMeeting] = useState('All');
-  const [isCsvModalOpen, setIsCsvModalOpen] = useState(false);
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [isManualModalOpen, setIsManualModalOpen] = useState(false);
   const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
   const [activeOutreachForNotes, setActiveOutreachForNotes] = useState(null);
   const [newNoteText, setNewNoteText] = useState('');
-
-  // CSV Parse state
-  const [csvRawText, setCsvRawText] = useState('');
-  const [parsedPreview, setParsedPreview] = useState([]);
+  const [importPreview, setImportPreview] = useState([]);
   const [batchName, setBatchName] = useState('Outreach Batch ' + new Date().toLocaleDateString());
 
   // Manual Add Form
@@ -89,130 +87,104 @@ export default function OutreachView() {
     });
   }, [outreachLeads, search, filterPotential, filterMeeting]);
 
-  // CSV File Handler
-  const handleFileUpload = (e) => {
+  // Export handlers
+  const handleExportExcel = () => {
+    const exportData = filteredList.map((item, idx) => ({
+      'SL': idx + 1,
+      'Date': item.createdAt ? item.createdAt.split('T')[0] : todayStr,
+      'Contact Name': item.name || '',
+      'Company Name': item.company || '',
+      'Phone / WhatsApp': item.phone || '',
+      'Email': item.email || '',
+      'Website': item.website || '',
+      'Potentiality': item.potentialityStatus || 'Cold',
+      'Meeting Status': item.meetingStatus || 'Not Scheduled',
+      'Proposal Status': item.proposalSentStatus || 'Not Sent',
+      'Follow-up Date': item.followUpDate || '',
+      'Notes Count': (item.followUpNotes || []).length,
+      'General Notes': item.generalNotes || ''
+    }));
+
+    exportToExcel(exportData, `Outreach_Leads_${todayStr}.xlsx`, 'Outreach');
+  };
+
+  const handleExportCsvFile = () => {
+    const exportData = filteredList.map((item, idx) => ({
+      'SL': idx + 1,
+      'Date': item.createdAt ? item.createdAt.split('T')[0] : todayStr,
+      'Contact Name': item.name || '',
+      'Company Name': item.company || '',
+      'Phone / WhatsApp': item.phone || '',
+      'Email': item.email || '',
+      'Website': item.website || '',
+      'Potentiality': item.potentialityStatus || 'Cold',
+      'Meeting Status': item.meetingStatus || 'Not Scheduled',
+      'Proposal Status': item.proposalSentStatus || 'Not Sent',
+      'Follow-up Date': item.followUpDate || ''
+    }));
+
+    exportToCsv(exportData, `Outreach_Leads_${todayStr}.csv`);
+  };
+
+  // Import handler (.xlsx, .xls, .csv)
+  const handleFileUpload = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const content = event.target?.result;
-      if (typeof content === 'string') {
-        setCsvRawText(content);
-        parseCsv(content);
-      }
-    };
-    reader.readAsText(file);
-  };
-
-  // CSV Parser with header detection
-  const parseCsv = (text) => {
     try {
-      const lines = text.split(/\r?\n/).filter(line => line.trim().length > 0);
-      if (lines.length < 2) {
-        setParsedPreview([]);
-        return;
-      }
-
-      const headers = lines[0].split(',').map(h => h.trim().replace(/^["']|["']$/g, '').toLowerCase());
-
-      const nameIdx = headers.findIndex(h => h.includes('name'));
-      const compIdx = headers.findIndex(h => h.includes('company') || h.includes('business'));
-      const phoneIdx = headers.findIndex(h => h.includes('phone') || h.includes('whatsapp') || h.includes('mobile'));
-      const emailIdx = headers.findIndex(h => h.includes('email'));
-      const webIdx = headers.findIndex(h => h.includes('web') || h.includes('url') || h.includes('site'));
-      const noteIdx = headers.findIndex(h => h.includes('note') || h.includes('req'));
-
-      const results = [];
-      for (let i = 1; i < lines.length; i++) {
-        // Simple comma split handling basic quotes
-        const cols = lines[i].split(',').map(c => c.trim().replace(/^["']|["']$/g, ''));
-        if (cols.length === 0 || !cols.some(c => c.length > 0)) continue;
-
-        const name = cols[nameIdx !== -1 ? nameIdx : 0] || 'Lead #' + i;
-        const company = compIdx !== -1 ? cols[compIdx] : '';
-        const phone = phoneIdx !== -1 ? cols[phoneIdx] : '';
-        const email = emailIdx !== -1 ? cols[emailIdx] : '';
-        const website = webIdx !== -1 ? cols[webIdx] : '';
-        const generalNotes = noteIdx !== -1 ? cols[noteIdx] : '';
-
-        results.push({
-          name,
-          company,
-          phone,
-          email,
-          website,
-          services: ['Website Development', 'SEO (Search Engine Optimization)'],
-          potentialityStatus: 'Cold',
-          meetingStatus: 'Not Scheduled',
-          proposalSentStatus: 'Not Sent',
-          followUpDate: todayStr,
-          generalNotes,
-          batchTag: batchName,
-          followUpNotes: []
-        });
-      }
-
-      setParsedPreview(results);
+      const rows = await parseExcelOrCsvFile(file);
+      processImportRows(rows);
     } catch (err) {
-      console.error('Error parsing CSV:', err);
+      alert('Error parsing file: ' + err.message);
     }
   };
 
-  const handleSaveImportedCsv = async () => {
-    if (parsedPreview.length === 0) return;
-    await importOutreachBatch(parsedPreview);
-    setIsCsvModalOpen(false);
-    setParsedPreview([]);
-    setCsvRawText('');
+  const processImportRows = (rows) => {
+    if (!rows || rows.length === 0) return;
+
+    const formatted = rows.map((r, idx) => {
+      const keys = Object.keys(r);
+      const nameKey = keys.find(k => /name|contact/i.test(k));
+      const compKey = keys.find(k => /company|business/i.test(k));
+      const phoneKey = keys.find(k => /phone|whatsapp|mobile/i.test(k));
+      const emailKey = keys.find(k => /email/i.test(k));
+      const webKey = keys.find(k => /web|site|url/i.test(k));
+      const noteKey = keys.find(k => /note|req/i.test(k));
+
+      return {
+        name: nameKey ? String(r[nameKey]).trim() : `Outreach Lead #${idx + 1}`,
+        company: compKey ? String(r[compKey]).trim() : '',
+        phone: phoneKey ? String(r[phoneKey]).trim() : '',
+        email: emailKey ? String(r[emailKey]).trim() : '',
+        website: webKey ? String(r[webKey]).trim() : '',
+        services: ['Website Development', 'SEO (Search Engine Optimization)'],
+        potentialityStatus: 'Cold',
+        meetingStatus: 'Not Scheduled',
+        proposalSentStatus: 'Not Sent',
+        followUpDate: todayStr,
+        generalNotes: noteKey ? String(r[noteKey]).trim() : '',
+        batchTag: batchName,
+        createdAt: new Date().toISOString(),
+        followUpNotes: []
+      };
+    });
+
+    setImportPreview(formatted.filter(item => item.name));
   };
 
-  // Export current filtered list as CSV
-  const handleExportCsv = () => {
-    const headers = [
-      'Name',
-      'Company',
-      'Phone',
-      'Email',
-      'Website',
-      'Potentiality Status',
-      'Meeting Status',
-      'Proposal Status',
-      'Follow-up Date',
-      'Notes Count',
-      'General Notes'
-    ];
-
-    const rows = filteredList.map(item => [
-      `"${item.name || ''}"`,
-      `"${item.company || ''}"`,
-      `"${item.phone || ''}"`,
-      `"${item.email || ''}"`,
-      `"${item.website || ''}"`,
-      `"${item.potentialityStatus || 'Cold'}"`,
-      `"${item.meetingStatus || 'Not Scheduled'}"`,
-      `"${item.proposalSentStatus || 'Not Sent'}"`,
-      `"${item.followUpDate || ''}"`,
-      `"${(item.followUpNotes || []).length}"`,
-      `"${(item.generalNotes || '').replace(/"/g, '""')}"`
-    ]);
-
-    const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement('a');
-    link.setAttribute('href', encodedUri);
-    link.setAttribute('download', `outreach_leads_sheet_${new Date().toISOString().split('T')[0]}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+  const handleSaveImportedBatch = async () => {
+    if (importPreview.length === 0) return;
+    await importOutreachBatch(importPreview);
+    setIsImportModalOpen(false);
+    setImportPreview([]);
   };
 
-  // In-line update for quick editing in table
+  // In-line cell update
   const handleQuickUpdate = async (id, field, value) => {
     await saveOutreachLead({ _id: id, [field]: value });
   };
 
-  // Add a follow-up note to outreach lead
+  // Follow-up note adder
   const handleAddFollowUpNote = async () => {
     if (!newNoteText.trim() || !activeOutreachForNotes) return;
 
@@ -240,56 +212,64 @@ export default function OutreachView() {
     setNewNoteText('');
   };
 
-  // Quick WhatsApp Launcher
   const handleOpenWhatsApp = (phone, name, company) => {
-    const cleanPhone = phone.replace(/[^0-9]/g, '');
-    const template = 'Hello {name}! Reaching out regarding growth for {company}. We help businesses rank higher on Google and run profitable ad campaigns. Would you be open to a 5-minute chat?';
-    const text = template
-      .replace('{name}', name || 'there')
-      .replace('{company}', company || 'your company');
-
-    window.open(`https://wa.me/${cleanPhone}?text=${encodeURIComponent(text)}`, '_blank');
+    const clean = phone.replace(/[^0-9]/g, '');
+    const msg = `Hello ${name || 'there'}! Reaching out regarding growth for ${company || 'your business'}. We help businesses rank on Google and run profitable ad campaigns. Would you be open to a 5-minute chat?`;
+    window.open(`https://wa.me/${clean}?text=${encodeURIComponent(msg)}`, '_blank');
   };
 
   return (
     <div className="space-y-6">
       
-      {/* Top Header & Actions */}
+      {/* Date Filter Bar */}
+      <DateFilterBar />
+
+      {/* Header */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
           <h2 className="text-xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
             <FileSpreadsheet className="w-5 h-5 text-blue-500" />
-            <span>Cold Outreach Leads & Arranged Sheet</span>
+            <span>Cold Outreach Leads Sheet</span>
             <span className="px-2.5 py-0.5 text-xs font-bold rounded-full bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300">
-              {outreachLeads.length} Leads
+              {filteredList.length} Leads
             </span>
           </h2>
           <p className="text-xs text-slate-500 dark:text-slate-400">
-            Import CSV files from cold outreach. Converted into an arranged interactive spreadsheet with multiple follow-up notes, meeting status & 1-click onboarding.
+            Import cold leads via Excel/CSV. Convert into arranged interactive spreadsheet with meeting status & 1-click onboarding.
           </p>
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
+          {/* Export Excel */}
+          <button
+            onClick={handleExportExcel}
+            className="flex items-center gap-1.5 px-3 py-2 text-xs font-bold rounded-xl text-blue-700 bg-blue-50 hover:bg-blue-100 dark:bg-blue-950/60 dark:text-blue-300 transition-colors border border-blue-200 dark:border-blue-800"
+            title="Download Excel (.xlsx)"
+          >
+            <Download className="w-3.5 h-3.5" />
+            <span>Export Excel</span>
+          </button>
+
           {/* Export CSV */}
           <button
-            onClick={handleExportCsv}
-            className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold rounded-xl text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
-            title="Download Arranged Sheet as CSV"
+            onClick={handleExportCsvFile}
+            className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold rounded-xl text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 transition-colors"
+            title="Download CSV"
           >
             <Download className="w-3.5 h-3.5" />
             <span>Export CSV</span>
           </button>
 
-          {/* Import CSV */}
+          {/* Import Excel / CSV */}
           <button
-            onClick={() => setIsCsvModalOpen(true)}
+            onClick={() => setIsImportModalOpen(true)}
             className="flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold rounded-xl text-white bg-blue-600 hover:bg-blue-500 shadow-md shadow-blue-600/20 active:scale-95 transition-all"
           >
             <Upload className="w-3.5 h-3.5" />
-            <span>Import CSV File</span>
+            <span>Import Excel / CSV</span>
           </button>
 
-          {/* Add Lead Manually */}
+          {/* Add Single Lead */}
           <button
             onClick={() => setIsManualModalOpen(true)}
             className="flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold rounded-xl text-white bg-emerald-600 hover:bg-emerald-500 shadow-md shadow-emerald-600/20 active:scale-95 transition-all"
@@ -300,25 +280,24 @@ export default function OutreachView() {
         </div>
       </div>
 
-      {/* Filter & Search Bar */}
+      {/* Filter Bar */}
       <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col sm:flex-row items-center gap-3">
         <div className="relative flex-1 w-full">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
           <input
             type="text"
-            placeholder="Filter by name, company, phone, email..."
+            placeholder="Search outreach leads by name, company, phone, email..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full pl-9 pr-3 py-2 text-xs font-medium rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/40"
+            className="w-full pl-8 pr-3 py-1.5 text-xs font-medium rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white"
           />
         </div>
 
         <div className="flex items-center gap-2 w-full sm:w-auto">
-          {/* Potentiality */}
           <select
             value={filterPotential}
             onChange={(e) => setFilterPotential(e.target.value)}
-            className="px-3 py-2 text-xs font-medium rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white"
+            className="px-3 py-1.5 text-xs font-medium rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white"
           >
             <option value="All">All Potentialities</option>
             <option value="Hot">🔥 Hot</option>
@@ -326,18 +305,16 @@ export default function OutreachView() {
             <option value="Cold">❄️ Cold</option>
             <option value="Qualified">Qualified</option>
             <option value="Unresponsive">Unresponsive</option>
-            <option value="Not Interested">Not Interested</option>
           </select>
 
-          {/* Meeting Status */}
           <select
             value={filterMeeting}
             onChange={(e) => setFilterMeeting(e.target.value)}
-            className="px-3 py-2 text-xs font-medium rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white"
+            className="px-3 py-1.5 text-xs font-medium rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white"
           >
             <option value="All">All Meetings</option>
-            <option value="Meeting Scheduled">Meeting Scheduled</option>
-            <option value="Completed">Completed</option>
+            <option value="Meeting Scheduled">📅 Scheduled</option>
+            <option value="Completed">✓ Completed</option>
             <option value="Rescheduled">Rescheduled</option>
             <option value="No Show">No Show</option>
             <option value="Not Scheduled">Not Scheduled</option>
@@ -345,31 +322,38 @@ export default function OutreachView() {
         </div>
       </div>
 
-      {/* Arranged Interactive Sheet Table */}
-      <div className="rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
-        <div className="overflow-x-auto max-h-[600px]">
+      {/* Spreadsheet Grid */}
+      <div className="rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
+        <div className="overflow-x-auto max-h-[650px]">
           <table className="w-full text-left border-collapse">
-            <thead className="sticky top-0 z-10 bg-slate-100 dark:bg-slate-800 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 border-b border-slate-200 dark:border-slate-700">
+            <thead className="sticky top-0 z-10 bg-slate-100/90 dark:bg-slate-800/90 backdrop-blur-md text-[11px] font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400 border-b border-slate-200 dark:border-slate-700">
               <tr>
-                <th className="py-3 px-4">Contact & Company</th>
-                <th className="py-3 px-4">WhatsApp Phone</th>
-                <th className="py-3 px-4">Potentiality Status</th>
-                <th className="py-3 px-4">Meeting Status</th>
-                <th className="py-3 px-4">Proposal Sent</th>
-                <th className="py-3 px-4">Follow-up Notice</th>
-                <th className="py-3 px-4">Follow-up Notes</th>
-                <th className="py-3 px-4 text-right">Actions</th>
+                <th className="py-3 px-3.5 w-10 text-center">SL</th>
+                <th className="py-3 px-4 min-w-[160px]">Contact & Company</th>
+                <th className="py-3 px-4 min-w-[140px]">WhatsApp Phone</th>
+                <th className="py-3 px-4 min-w-[140px]">Potentiality</th>
+                <th className="py-3 px-4 min-w-[150px]">Meeting Status</th>
+                <th className="py-3 px-4 min-w-[140px]">Proposal Status</th>
+                <th className="py-3 px-4 min-w-[140px]">Follow-up Notice</th>
+                <th className="py-3 px-4 min-w-[110px]">Notes</th>
+                <th className="py-3 px-4 text-right min-w-[120px]">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 text-xs">
               {filteredList.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="py-12 text-center text-slate-400">
-                    No outreach leads in this view. Import a CSV or click &quot;Add Single Lead&quot;.
+                  <td colSpan={9} className="py-16 text-center text-slate-400">
+                    <div className="max-w-sm mx-auto space-y-2">
+                      <FileSpreadsheet className="w-10 h-10 mx-auto opacity-50 text-blue-500" />
+                      <h4 className="font-bold text-slate-700 dark:text-slate-300">No Cold Outreach Leads</h4>
+                      <p className="text-xs text-slate-500">
+                        Upload an outreach Excel/CSV file or click &quot;Add Single Lead&quot; to begin tracking outreach.
+                      </p>
+                    </div>
                   </td>
                 </tr>
               ) : (
-                filteredList.map((item) => {
+                filteredList.map((item, index) => {
                   const isOverdue = item.followUpDate && item.followUpDate < todayStr;
                   const isDueToday = item.followUpDate && item.followUpDate === todayStr;
                   const noteCount = (item.followUpNotes || []).length;
@@ -377,24 +361,26 @@ export default function OutreachView() {
                   return (
                     <tr 
                       key={item._id}
-                      className="hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition-colors"
+                      className="hover:bg-slate-50/90 dark:hover:bg-slate-800/50 transition-colors"
                     >
-                      {/* Name & Company */}
+                      <td className="py-3 px-3.5 text-center text-slate-400 font-mono text-[11px]">
+                        {index + 1}
+                      </td>
+
                       <td className="py-3 px-4">
                         <div className="font-bold text-slate-900 dark:text-white">
                           {item.name}
                         </div>
                         <div className="text-[11px] text-slate-500 dark:text-slate-400">
-                          {item.company || 'Direct Outreach'} {item.email && `• ${item.email}`}
+                          {item.company || 'Outreach Lead'} {item.email && `• ${item.email}`}
                         </div>
                       </td>
 
-                      {/* WhatsApp Phone */}
                       <td className="py-3 px-4 font-mono">
                         {item.phone ? (
                           <button
                             onClick={() => handleOpenWhatsApp(item.phone, item.name, item.company)}
-                            className="inline-flex items-center gap-1 text-emerald-600 dark:text-emerald-400 hover:underline"
+                            className="inline-flex items-center gap-1.5 px-2 py-1 rounded-lg text-xs font-semibold bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 hover:bg-emerald-100 transition-colors"
                             title="Chat on WhatsApp"
                           >
                             <Phone className="w-3 h-3 text-emerald-500" />
@@ -405,12 +391,11 @@ export default function OutreachView() {
                         )}
                       </td>
 
-                      {/* Potentiality Status (In-line Dropdown) */}
                       <td className="py-3 px-4">
                         <select
                           value={item.potentialityStatus}
                           onChange={(e) => handleQuickUpdate(item._id, 'potentialityStatus', e.target.value)}
-                          className={`px-2 py-1 rounded-lg text-xs font-bold border focus:outline-none ${
+                          className={`px-2 py-1 rounded-xl text-xs font-bold border focus:outline-none cursor-pointer ${
                             item.potentialityStatus === 'Hot'
                               ? 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300 border-amber-300'
                               : item.potentialityStatus === 'Warm'
@@ -423,31 +408,28 @@ export default function OutreachView() {
                           <option value="Cold">❄️ Cold</option>
                           <option value="Qualified">Qualified</option>
                           <option value="Unresponsive">Unresponsive</option>
-                          <option value="Not Interested">Not Interested</option>
                         </select>
                       </td>
 
-                      {/* Meeting Status (In-line Dropdown) */}
                       <td className="py-3 px-4">
                         <select
                           value={item.meetingStatus}
                           onChange={(e) => handleQuickUpdate(item._id, 'meetingStatus', e.target.value)}
-                          className="px-2 py-1 rounded-lg text-xs font-semibold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 focus:outline-none"
+                          className="px-2 py-1 rounded-xl text-xs font-semibold bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-slate-700 focus:outline-none cursor-pointer"
                         >
                           <option value="Not Scheduled">Not Scheduled</option>
-                          <option value="Meeting Scheduled">📅 Meeting Scheduled</option>
+                          <option value="Meeting Scheduled">📅 Scheduled</option>
                           <option value="Completed">✓ Completed</option>
                           <option value="Rescheduled">Rescheduled</option>
                           <option value="No Show">No Show</option>
                         </select>
                       </td>
 
-                      {/* Proposal Status (In-line Dropdown) */}
                       <td className="py-3 px-4">
                         <select
                           value={item.proposalSentStatus}
                           onChange={(e) => handleQuickUpdate(item._id, 'proposalSentStatus', e.target.value)}
-                          className="px-2 py-1 rounded-lg text-xs font-semibold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 focus:outline-none"
+                          className="px-2 py-1 rounded-xl text-xs font-semibold bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-slate-700 focus:outline-none cursor-pointer"
                         >
                           <option value="Not Sent">Not Sent</option>
                           <option value="Drafted">Drafted</option>
@@ -457,58 +439,51 @@ export default function OutreachView() {
                         </select>
                       </td>
 
-                      {/* Follow-up Notice Date */}
                       <td className="py-3 px-4">
-                        <div className="flex items-center gap-1.5">
-                          <input
-                            type="date"
-                            value={item.followUpDate || ''}
-                            onChange={(e) => handleQuickUpdate(item._id, 'followUpDate', e.target.value)}
-                            className={`px-2 py-1 text-xs font-medium rounded-lg border focus:outline-none ${
-                              isOverdue
-                                ? 'bg-red-50 text-red-700 border-red-300 dark:bg-red-950 dark:text-red-300 animate-pulse'
-                                : isDueToday
-                                  ? 'bg-amber-50 text-amber-800 border-amber-300 dark:bg-amber-950 dark:text-amber-300'
-                                  : 'bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-slate-200 border-slate-200 dark:border-slate-700'
-                            }`}
-                          />
-                        </div>
+                        <input
+                          type="date"
+                          value={item.followUpDate || ''}
+                          onChange={(e) => handleQuickUpdate(item._id, 'followUpDate', e.target.value)}
+                          className={`px-2 py-1 text-xs font-semibold rounded-lg border focus:outline-none ${
+                            isOverdue
+                              ? 'bg-red-50 text-red-700 border-red-300 dark:bg-red-950 dark:text-red-300 animate-pulse'
+                              : isDueToday
+                                ? 'bg-amber-50 text-amber-800 border-amber-300 dark:bg-amber-950 dark:text-amber-300'
+                                : 'bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-slate-200 border-slate-200 dark:border-slate-700'
+                          }`}
+                        />
                       </td>
 
-                      {/* Multiple Follow-up Notes Button */}
                       <td className="py-3 px-4">
                         <button
                           onClick={() => {
                             setActiveOutreachForNotes(item);
                             setIsNoteModalOpen(true);
                           }}
-                          className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
+                          className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 transition-colors"
                         >
                           <FileText className="w-3.5 h-3.5 text-blue-500" />
                           <span>{noteCount} {noteCount === 1 ? 'Note' : 'Notes'}</span>
                         </button>
                       </td>
 
-                      {/* Actions */}
                       <td className="py-3 px-4 text-right">
                         <div className="flex items-center justify-end gap-1.5">
-                          {/* Convert to Client */}
                           <button
                             onClick={() => convertToClient(item)}
-                            className="p-1.5 rounded-lg text-purple-600 hover:bg-purple-50 dark:hover:bg-purple-950/50"
-                            title="Onboard as Client"
+                            className="p-1.5 rounded-lg text-purple-600 hover:bg-purple-50 dark:hover:bg-purple-950/60"
+                            title="Onboard this lead as Client"
                           >
                             <UserCheck className="w-4 h-4" />
                           </button>
 
-                          {/* Delete */}
                           <button
                             onClick={() => {
                               if (confirm(`Delete outreach lead "${item.name}"?`)) {
                                 removeOutreachLead(item._id);
                               }
                             }}
-                            className="p-1.5 rounded-lg text-red-500 hover:bg-red-50 dark:hover:bg-red-950/50"
+                            className="p-1.5 rounded-lg text-red-500 hover:bg-red-50 dark:hover:bg-red-950/60"
                             title="Delete Lead"
                           >
                             <Trash2 className="w-4 h-4" />
@@ -524,142 +499,82 @@ export default function OutreachView() {
         </div>
       </div>
 
-      {/* ================= CSV UPLOAD MODAL ================= */}
-      {isCsvModalOpen && (
+      {/* Import Modal */}
+      {isImportModalOpen && (
         <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/70 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in">
-          <div className="relative w-full max-w-2xl rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xl overflow-hidden my-8 p-6 space-y-4">
-            
+          <div className="relative w-full max-w-2xl rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xl p-6 space-y-4">
             <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
-              <div>
-                <h3 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                  <Upload className="w-4 h-4 text-blue-500" />
-                  Import Outreach CSV File
-                </h3>
-                <p className="text-xs text-slate-500 dark:text-slate-400">
-                  Upload a lead spreadsheet or paste raw CSV text to automatically convert into organized interactive records.
-                </p>
-              </div>
-              <button 
-                onClick={() => setIsCsvModalOpen(false)}
-                className="text-slate-400 hover:text-slate-600"
-              >
+              <h3 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                <Upload className="w-4 h-4 text-blue-500" />
+                Import Cold Outreach Leads (Excel / CSV)
+              </h3>
+              <button onClick={() => setIsImportModalOpen(false)} className="text-slate-400 hover:text-slate-600">
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            {/* Batch Tag Name */}
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                Batch Import Tag
-              </label>
-              <input
-                type="text"
-                value={batchName}
-                onChange={(e) => setBatchName(e.target.value)}
-                className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white"
-              />
-            </div>
-
-            {/* File drop zone */}
             <div className="border-2 border-dashed border-slate-300 dark:border-slate-700 rounded-2xl p-6 text-center hover:border-blue-500 transition-colors">
               <FileUp className="w-8 h-8 text-blue-500 mx-auto mb-2" />
-              <p className="text-xs font-semibold text-slate-700 dark:text-slate-300">
-                Choose CSV file from your computer
-              </p>
-              <p className="text-[11px] text-slate-400 mb-3">
-                Columns recognized: Name, Company, Phone, Email, Website, Notes
+              <p className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                Click to browse Excel (.xlsx, .xls) or CSV
               </p>
               <input
                 type="file"
-                accept=".csv,text/csv"
+                accept=".xlsx,.xls,.csv"
                 onChange={handleFileUpload}
-                className="text-xs text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+                className="text-xs text-slate-500 mt-2"
               />
             </div>
 
-            {/* Raw Text Paste Alternative */}
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                Or Paste CSV Text Directly:
-              </label>
-              <textarea
-                rows={4}
-                placeholder="Name,Company,Phone,Email,Notes&#10;Dr. Alex,Dental Care,+14155551234,alex@dental.com,Needs GBP setup"
-                value={csvRawText}
-                onChange={(e) => {
-                  setCsvRawText(e.target.value);
-                  parseCsv(e.target.value);
-                }}
-                className="w-full px-3 py-2 text-xs font-mono rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white"
-              />
-            </div>
-
-            {/* Parsed Preview Counter */}
-            {parsedPreview.length > 0 && (
-              <div className="p-3 rounded-xl bg-blue-50 dark:bg-blue-950/60 border border-blue-200 dark:border-blue-800 text-xs text-blue-800 dark:text-blue-300 flex items-center justify-between">
-                <span>
-                  ✓ <strong>{parsedPreview.length}</strong> leads parsed and arranged ready to import!
-                </span>
-                <span className="text-[10px] bg-blue-200 dark:bg-blue-900 px-2 py-0.5 rounded-full font-bold">
-                  Preview Ready
-                </span>
+            {importPreview.length > 0 && (
+              <div className="p-3 rounded-2xl bg-blue-50 dark:bg-blue-950/60 border border-blue-200 dark:border-blue-800 text-xs text-blue-800 dark:text-blue-300 flex items-center justify-between">
+                <span>✓ {importPreview.length} leads parsed ready to import</span>
+                <span className="font-bold text-[10px] bg-blue-200 dark:bg-blue-900 px-2 py-0.5 rounded-full">Ready</span>
               </div>
             )}
 
-            {/* Actions */}
             <div className="flex items-center justify-end gap-3 pt-2">
               <button
-                onClick={() => setIsCsvModalOpen(false)}
+                onClick={() => setIsImportModalOpen(false)}
                 className="px-4 py-2 text-xs font-semibold rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300"
               >
                 Cancel
               </button>
               <button
-                onClick={handleSaveImportedCsv}
-                disabled={parsedPreview.length === 0}
-                className="px-5 py-2 text-xs font-bold rounded-xl text-white bg-blue-600 hover:bg-blue-500 disabled:opacity-50 transition-all shadow-md shadow-blue-600/20"
+                onClick={handleSaveImportedBatch}
+                disabled={importPreview.length === 0}
+                className="px-5 py-2 text-xs font-bold rounded-xl text-white bg-blue-600 hover:bg-blue-500 disabled:opacity-50"
               >
-                Save {parsedPreview.length} Leads to Arranged Sheet
+                Save to Outreach Sheet
               </button>
             </div>
-
           </div>
         </div>
       )}
 
-      {/* ================= MULTIPLE FOLLOW-UP NOTES MODAL ================= */}
+      {/* Multiple Follow-up Notes Modal */}
       {isNoteModalOpen && activeOutreachForNotes && (
         <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/70 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in">
           <div className="relative w-full max-w-lg rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xl p-6 space-y-4">
-            
             <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
-              <div>
-                <h3 className="text-base font-bold text-slate-900 dark:text-white">
-                  Follow-up Notes: {activeOutreachForNotes.name}
-                </h3>
-                <p className="text-xs text-slate-500 dark:text-slate-400">
-                  {activeOutreachForNotes.company || 'Outreach Lead'} • Multiple timestamped follow-up history
-                </p>
-              </div>
+              <h3 className="text-base font-bold text-slate-900 dark:text-white">
+                Follow-up Notes: {activeOutreachForNotes.name}
+              </h3>
               <button onClick={() => setIsNoteModalOpen(false)} className="text-slate-400 hover:text-slate-600">
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            {/* Existing notes */}
             <div className="space-y-2 max-h-60 overflow-y-auto">
               {(activeOutreachForNotes.followUpNotes || []).length === 0 ? (
                 <p className="text-xs text-slate-400 italic py-4 text-center">
-                  No previous follow-up notes recorded. Add one below!
+                  No previous follow-up notes recorded.
                 </p>
               ) : (
                 activeOutreachForNotes.followUpNotes.map((n, idx) => (
-                  <div 
-                    key={n._id || idx}
-                    className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/60 dark:border-slate-700/60 text-xs space-y-1"
-                  >
-                    <div className="flex items-center justify-between text-slate-400 text-[10px]">
-                      <span className="font-bold text-slate-700 dark:text-slate-300">Follow-up Note #{idx + 1}</span>
+                  <div key={n._id || idx} className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 text-xs space-y-1">
+                    <div className="flex justify-between text-slate-400 text-[10px]">
+                      <span>Note #{idx + 1}</span>
                       <span>{new Date(n.date).toLocaleDateString()}</span>
                     </div>
                     <p className="text-slate-800 dark:text-slate-200">{n.note}</p>
@@ -668,14 +583,10 @@ export default function OutreachView() {
               )}
             </div>
 
-            {/* Add new note */}
             <div className="space-y-2 pt-2 border-t border-slate-100 dark:border-slate-800">
-              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">
-                Add New Follow-up Note:
-              </label>
               <textarea
                 rows={2}
-                placeholder="e.g. Sent follow-up WhatsApp message about their Google Map ranking..."
+                placeholder="Log follow-up touchpoint note..."
                 value={newNoteText}
                 onChange={(e) => setNewNoteText(e.target.value)}
                 className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white"
@@ -683,21 +594,19 @@ export default function OutreachView() {
               <button
                 onClick={handleAddFollowUpNote}
                 disabled={!newNoteText.trim()}
-                className="w-full py-2 text-xs font-bold rounded-xl text-white bg-blue-600 hover:bg-blue-500 disabled:opacity-50 transition-colors shadow-sm"
+                className="w-full py-2 text-xs font-bold rounded-xl text-white bg-blue-600 hover:bg-blue-500 disabled:opacity-50"
               >
                 Save Follow-up Note
               </button>
             </div>
-
           </div>
         </div>
       )}
 
-      {/* ================= MANUAL SINGLE LEAD MODAL ================= */}
+      {/* Manual Single Lead Modal */}
       {isManualModalOpen && (
         <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/70 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in">
           <div className="relative w-full max-w-lg rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xl p-6 space-y-4">
-            
             <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
               <h3 className="text-base font-bold text-slate-900 dark:text-white">
                 Add Single Outreach Lead
@@ -715,7 +624,7 @@ export default function OutreachView() {
                 <input
                   type="text"
                   required
-                  placeholder="e.g. Michael Chang"
+                  placeholder="e.g. Marcus Sterling"
                   value={manualForm.name}
                   onChange={(e) => setManualForm({ ...manualForm, name: e.target.value })}
                   className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white"
@@ -724,11 +633,11 @@ export default function OutreachView() {
 
               <div>
                 <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                  Company / Clinic / Business
+                  Company / Business
                 </label>
                 <input
                   type="text"
-                  placeholder="e.g. Apex Dental Care"
+                  placeholder="e.g. Sterling Law Partners"
                   value={manualForm.company}
                   onChange={(e) => setManualForm({ ...manualForm, company: e.target.value })}
                   className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white"
@@ -742,7 +651,7 @@ export default function OutreachView() {
                   </label>
                   <input
                     type="tel"
-                    placeholder="+14158889901"
+                    placeholder="+8801700000000"
                     value={manualForm.phone}
                     onChange={(e) => setManualForm({ ...manualForm, phone: e.target.value })}
                     className="w-full px-3 py-2 text-xs font-mono rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white"
@@ -758,35 +667,6 @@ export default function OutreachView() {
                     placeholder="contact@business.com"
                     value={manualForm.email}
                     onChange={(e) => setManualForm({ ...manualForm, email: e.target.value })}
-                    className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                    Potentiality Status
-                  </label>
-                  <select
-                    value={manualForm.potentialityStatus}
-                    onChange={(e) => setManualForm({ ...manualForm, potentialityStatus: e.target.value })}
-                    className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white"
-                  >
-                    <option value="Hot">🔥 Hot</option>
-                    <option value="Warm">☀️ Warm</option>
-                    <option value="Cold">❄️ Cold</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                    Follow-up Date
-                  </label>
-                  <input
-                    type="date"
-                    value={manualForm.followUpDate}
-                    onChange={(e) => setManualForm({ ...manualForm, followUpDate: e.target.value })}
                     className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white"
                   />
                 </div>
@@ -819,12 +699,11 @@ export default function OutreachView() {
                     generalNotes: '',
                   });
                 }}
-                className="px-5 py-2 text-xs font-bold rounded-xl text-white bg-emerald-600 hover:bg-emerald-500 shadow-md shadow-emerald-600/20"
+                className="px-5 py-2 text-xs font-bold rounded-xl text-white bg-emerald-600 hover:bg-emerald-500"
               >
-                Save Outreach Lead
+                Save Lead
               </button>
             </div>
-
           </div>
         </div>
       )}
@@ -832,4 +711,3 @@ export default function OutreachView() {
     </div>
   );
 }
-

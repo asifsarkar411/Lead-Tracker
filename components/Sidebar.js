@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import { useApp } from '@/context/AppContext';
 import { 
   LayoutDashboard, 
@@ -9,77 +9,41 @@ import {
   Briefcase, 
   BellRing, 
   Settings, 
-  Flame, 
-  TrendingUp,
-  Database
+  FolderKanban,
+  ChevronDown,
+  ChevronRight,
+  Star,
+  Link2
 } from 'lucide-react';
 
 export default function Sidebar({ mobileOpen, onCloseMobile }) {
   const { 
     activeTab, 
     setActiveTab, 
+    clientListSubTab, 
+    setClientListSubTab, 
     leads, 
     outreachLeads, 
     clients, 
-    totalNoticeCount,
-    dbStatus
+    demoLinks,
+    successfulClients,
+    totalNoticeCount 
   } = useApp();
 
-  const hotLeadsCount = leads.filter(l => l.potentialityStatus === 'Hot').length;
-
-  const navItems = [
-    {
-      id: 'dashboard',
-      label: 'Dashboard',
-      icon: LayoutDashboard,
-      badge: null,
-      desc: 'Pipeline & Analytics'
-    },
-    {
-      id: 'leads',
-      label: 'WhatsApp Leads',
-      icon: MessageSquare,
-      badge: hotLeadsCount > 0 ? `${hotLeadsCount} Hot` : `${leads.length}`,
-      badgeColor: 'bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30',
-      desc: 'Inbound Ads & Chat'
-    },
-    {
-      id: 'outreach',
-      label: 'Outreach & CSV',
-      icon: FileSpreadsheet,
-      badge: outreachLeads.length,
-      badgeColor: 'bg-blue-500/20 text-blue-600 dark:text-blue-400 border border-blue-500/30',
-      desc: 'Cold Leads Sheet'
-    },
-    {
-      id: 'clients',
-      label: 'Onboarded Clients',
-      icon: Briefcase,
-      badge: clients.length,
-      badgeColor: 'bg-purple-500/20 text-purple-600 dark:text-purple-400 border border-purple-500/30',
-      desc: 'Deals & Revenue'
-    },
-    {
-      id: 'reminders',
-      label: 'Notice & Reminders',
-      icon: BellRing,
-      badge: totalNoticeCount > 0 ? totalNoticeCount : null,
-      badgeColor: 'bg-red-500 text-white animate-pulse',
-      desc: 'Follow-up Alerts'
-    },
-    {
-      id: 'admin',
-      label: 'Admin Control',
-      icon: Settings,
-      badge: null,
-      desc: 'Dynamic Branding & Services'
-    }
-  ];
+  const [isClientListOpen, setIsClientListOpen] = useState(true);
 
   const handleSelectTab = (id) => {
     setActiveTab(id);
     if (onCloseMobile) onCloseMobile();
   };
+
+  const handleSelectClientListSub = (subTab) => {
+    setActiveTab('client-list');
+    setClientListSubTab(subTab);
+    if (onCloseMobile) onCloseMobile();
+  };
+
+  const hotLeadsCount = leads.filter(l => l.potentialityStatus === 'Hot').length;
 
   return (
     <>
@@ -97,60 +61,184 @@ export default function Sidebar({ mobileOpen, onCloseMobile }) {
           mobileOpen ? 'translate-x-0' : '-translate-x-full'
         } flex flex-col justify-between`}
       >
-        <div className="space-y-1">
-          <div className="px-3 py-2 text-xs font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+        <div className="space-y-1.5 overflow-y-auto">
+          <div className="px-3 py-2 text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
             Agency Navigation
           </div>
 
-          {navItems.map((item) => {
-            const Icon = item.icon;
-            const isActive = activeTab === item.id;
-            return (
-              <button
-                key={item.id}
-                onClick={() => handleSelectTab(item.id)}
-                className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-left font-medium text-sm transition-all duration-150 ${
-                  isActive
-                    ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 shadow-sm'
-                    : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800/60'
-                }`}
-              >
-                <div className="flex items-center gap-3">
-                  <Icon className={`w-4 h-4 ${isActive ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-400'}`} />
-                  <div>
-                    <span className="block">{item.label}</span>
-                    <span className="text-[10px] text-slate-400 dark:text-slate-500 font-normal">
-                      {item.desc}
-                    </span>
-                  </div>
-                </div>
+          {/* 1. Dashboard */}
+          <button
+            onClick={() => handleSelectTab('dashboard')}
+            className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-left font-semibold text-xs transition-all ${
+              activeTab === 'dashboard'
+                ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 shadow-sm'
+                : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800/60'
+            }`}
+          >
+            <div className="flex items-center gap-3">
+              <LayoutDashboard className={`w-4 h-4 ${activeTab === 'dashboard' ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-400'}`} />
+              <span>Dashboard</span>
+            </div>
+          </button>
 
-                {item.badge !== null && (
-                  <span className={`px-2 py-0.5 text-xs font-bold rounded-full ${item.badgeColor}`}>
-                    {item.badge}
+          {/* 2. WhatsApp Leads (Separate Inbound Channel) */}
+          <button
+            onClick={() => handleSelectTab('leads')}
+            className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-left font-semibold text-xs transition-all ${
+              activeTab === 'leads'
+                ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 shadow-sm'
+                : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800/60'
+            }`}
+          >
+            <div className="flex items-center gap-3">
+              <MessageSquare className={`w-4 h-4 ${activeTab === 'leads' ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-400'}`} />
+              <span>WhatsApp Leads</span>
+            </div>
+            <span className="px-2 py-0.5 text-[11px] font-bold rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300">
+              {leads.length}
+            </span>
+          </button>
+
+          {/* 3. Outreach Leads (Separate Cold Channel) */}
+          <button
+            onClick={() => handleSelectTab('outreach')}
+            className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-left font-semibold text-xs transition-all ${
+              activeTab === 'outreach'
+                ? 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20 shadow-sm'
+                : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800/60'
+            }`}
+          >
+            <div className="flex items-center gap-3">
+              <FileSpreadsheet className={`w-4 h-4 ${activeTab === 'outreach' ? 'text-blue-600 dark:text-blue-400' : 'text-slate-400'}`} />
+              <span>Outreach Leads</span>
+            </div>
+            <span className="px-2 py-0.5 text-[11px] font-bold rounded-full bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-300">
+              {outreachLeads.length}
+            </span>
+          </button>
+
+          {/* 4. Onboarded Clients (Separate Channel) */}
+          <button
+            onClick={() => handleSelectTab('clients')}
+            className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-left font-semibold text-xs transition-all ${
+              activeTab === 'clients'
+                ? 'bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20 shadow-sm'
+                : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800/60'
+            }`}
+          >
+            <div className="flex items-center gap-3">
+              <Briefcase className={`w-4 h-4 ${activeTab === 'clients' ? 'text-purple-600 dark:text-purple-400' : 'text-slate-400'}`} />
+              <span>Onboarded Clients</span>
+            </div>
+            <span className="px-2 py-0.5 text-[11px] font-bold rounded-full bg-purple-100 text-purple-700 dark:bg-purple-950 dark:text-purple-300">
+              {clients.length}
+            </span>
+          </button>
+
+          {/* 5. Client List (Dropdown Options: Successful Clients & Demo Links) */}
+          <div className="pt-1">
+            <button
+              onClick={() => setIsClientListOpen(!isClientListOpen)}
+              className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-left font-semibold text-xs transition-all ${
+                activeTab === 'client-list'
+                  ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20'
+                  : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800/60'
+              }`}
+            >
+              <div className="flex items-center gap-3">
+                <FolderKanban className={`w-4 h-4 ${activeTab === 'client-list' ? 'text-amber-500' : 'text-slate-400'}`} />
+                <span>Client List</span>
+              </div>
+              {isClientListOpen ? <ChevronDown className="w-3.5 h-3.5 text-slate-400" /> : <ChevronRight className="w-3.5 h-3.5 text-slate-400" />}
+            </button>
+
+            {/* Sub-menu Dropdown */}
+            {isClientListOpen && (
+              <div className="pl-6 pr-1 pt-1.5 space-y-1">
+                {/* Sub option 1: Successful Clients */}
+                <button
+                  onClick={() => handleSelectClientListSub('successful')}
+                  className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-semibold transition-all ${
+                    activeTab === 'client-list' && clientListSubTab === 'successful'
+                      ? 'bg-amber-500/20 text-amber-700 dark:text-amber-300 font-bold'
+                      : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800/50'
+                  }`}
+                >
+                  <div className="flex items-center gap-2">
+                    <Star className="w-3.5 h-3.5 text-amber-500" />
+                    <span>Successful Clients</span>
+                  </div>
+                  <span className="text-[10px] font-bold px-1.5 py-0.2 rounded-md bg-amber-100 dark:bg-amber-950 text-amber-700 dark:text-amber-300">
+                    {successfulClients.length}
                   </span>
-                )}
-              </button>
-            );
-          })}
+                </button>
+
+                {/* Sub option 2: Demo Links */}
+                <button
+                  onClick={() => handleSelectClientListSub('demo-links')}
+                  className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-semibold transition-all ${
+                    activeTab === 'client-list' && clientListSubTab === 'demo-links'
+                      ? 'bg-amber-500/20 text-amber-700 dark:text-amber-300 font-bold'
+                      : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800/50'
+                  }`}
+                >
+                  <div className="flex items-center gap-2">
+                    <Link2 className="w-3.5 h-3.5 text-blue-500" />
+                    <span>Demo Links</span>
+                  </div>
+                  <span className="text-[10px] font-bold px-1.5 py-0.2 rounded-md bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-300">
+                    {demoLinks.length}
+                  </span>
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* 6. Follow-up Notices */}
+          <button
+            onClick={() => handleSelectTab('reminders')}
+            className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-left font-semibold text-xs transition-all ${
+              activeTab === 'reminders'
+                ? 'bg-red-500/10 text-red-600 dark:text-red-400 border border-red-500/20 shadow-sm'
+                : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800/60'
+            }`}
+          >
+            <div className="flex items-center gap-3">
+              <BellRing className={`w-4 h-4 ${activeTab === 'reminders' ? 'text-red-500' : 'text-slate-400'}`} />
+              <span>Follow-up Notice</span>
+            </div>
+            {totalNoticeCount > 0 && (
+              <span className="px-2 py-0.5 text-[11px] font-bold rounded-full bg-red-500 text-white animate-pulse">
+                {totalNoticeCount}
+              </span>
+            )}
+          </button>
+
+          {/* 7. Admin Panel */}
+          <button
+            onClick={() => handleSelectTab('admin')}
+            className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-left font-semibold text-xs transition-all ${
+              activeTab === 'admin'
+                ? 'bg-slate-900 text-white dark:bg-emerald-600 dark:text-white shadow-sm'
+                : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800/60'
+            }`}
+          >
+            <div className="flex items-center gap-3">
+              <Settings className="w-4 h-4" />
+              <span>Admin Panel</span>
+            </div>
+          </button>
         </div>
 
-        {/* Database Status Card in Sidebar Footer */}
+        {/* Clean Footer without Git/Database technical boxes */}
         <div className="pt-4 border-t border-slate-200 dark:border-slate-800">
-          <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200/80 dark:border-slate-800">
-            <div className="flex items-center justify-between mb-1.5">
-              <span className="text-xs font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
-                <Database className="w-3.5 h-3.5 text-emerald-500" />
-                Database Engine
-              </span>
-              <span className={`h-2 w-2 rounded-full ${dbStatus.isMongoConnected ? 'bg-emerald-500 animate-pulse' : 'bg-amber-400'}`} />
-            </div>
-            <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-tight">
-              {dbStatus.isMongoConnected 
-                ? 'Connected to MongoDB Atlas'
-                : 'Demo/Local Mode Active (MongoDB Atlas ready)'
-              }
-            </p>
+          <div className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/40 text-center">
+            <span className="text-[11px] font-bold text-slate-700 dark:text-slate-300 block">
+              Agency CRM Suite
+            </span>
+            <span className="text-[10px] text-slate-400">
+              100% Dynamic & Editable
+            </span>
           </div>
         </div>
 
@@ -158,4 +246,3 @@ export default function Sidebar({ mobileOpen, onCloseMobile }) {
     </>
   );
 }
-

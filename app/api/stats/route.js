@@ -1,39 +1,72 @@
 import { NextResponse } from 'next/server';
-import { getLeads, getOutreachLeads, getClients } from '@/lib/store';
+import { getLeads, getOutreachLeads, getClients, getSuccessfulClients } from '@/lib/store';
 
-export async function GET() {
+export const dynamic = 'force-dynamic';
+
+export async function GET(request) {
   try {
-    const leads = await getLeads();
-    const outreach = await getOutreachLeads();
-    const clients = await getClients();
+    const { searchParams } = new URL(request.url);
+    const date = searchParams.get('date') || '';
+    const month = searchParams.get('month') || '';
+    const year = searchParams.get('year') || '';
+
+    const leads = await getLeads({ date, month, year });
+    const outreach = await getOutreachLeads({ date, month, year });
+    const clients = await getClients({ date, month, year });
+    const successfulClients = await getSuccessfulClients();
 
     const todayStr = new Date().toISOString().split('T')[0];
 
-    // Follow-up status calculation
-    let dueTodayFollowUps = 0;
-    let overdueFollowUps = 0;
-    let upcomingFollowUps = 0;
+    // Detailed Follow-up analysis
+    let dueTodayFollowUps = [];
+    let overdueFollowUps = [];
+    let upcomingFollowUps = [];
 
     leads.forEach((l) => {
       if (l.followUpDate) {
+        const itemInfo = {
+          _id: l._id,
+          name: l.name,
+          phone: l.phone,
+          service: (l.services || [])[0] || 'Digital Services',
+          requirements: l.requirements,
+          followUpDate: l.followUpDate,
+          followUpTime: l.followUpTime || '11:00 AM',
+          type: 'WhatsApp Lead',
+          potentialityStatus: l.potentialityStatus,
+          notesCount: (l.followUpNotes || []).length
+        };
         if (l.followUpDate === todayStr) {
-          dueTodayFollowUps++;
+          dueTodayFollowUps.push(itemInfo);
         } else if (l.followUpDate < todayStr) {
-          overdueFollowUps++;
+          overdueFollowUps.push(itemInfo);
         } else {
-          upcomingFollowUps++;
+          upcomingFollowUps.push(itemInfo);
         }
       }
     });
 
     outreach.forEach((o) => {
       if (o.followUpDate) {
+        const itemInfo = {
+          _id: o._id,
+          name: o.name,
+          company: o.company,
+          phone: o.phone,
+          service: (o.services || [])[0] || 'Outreach',
+          requirements: o.generalNotes,
+          followUpDate: o.followUpDate,
+          followUpTime: '11:00 AM',
+          type: 'Cold Outreach',
+          potentialityStatus: o.potentialityStatus,
+          notesCount: (o.followUpNotes || []).length
+        };
         if (o.followUpDate === todayStr) {
-          dueTodayFollowUps++;
+          dueTodayFollowUps.push(itemInfo);
         } else if (o.followUpDate < todayStr) {
-          overdueFollowUps++;
+          overdueFollowUps.push(itemInfo);
         } else {
-          upcomingFollowUps++;
+          upcomingFollowUps.push(itemInfo);
         }
       }
     });
@@ -43,15 +76,15 @@ export async function GET() {
       Hot: leads.filter((l) => l.potentialityStatus === 'Hot').length,
       Warm: leads.filter((l) => l.potentialityStatus === 'Warm').length,
       Cold: leads.filter((l) => l.potentialityStatus === 'Cold').length,
-      Lost: leads.filter((l) => l.potentialityStatus === 'Lost').length,
       Converted: leads.filter((l) => l.potentialityStatus === 'Converted').length,
+      Lost: leads.filter((l) => l.potentialityStatus === 'Lost').length,
     };
 
-    // Revenue calculations
+    // Revenue calculations in BDT (৳)
     const totalAskingCost = clients.reduce((sum, c) => sum + (Number(c.askingCost) || 0), 0);
     const totalWonCost = clients.reduce((sum, c) => sum + (Number(c.wonCost) || 0), 0);
     const totalCollected = clients.reduce((sum, c) => sum + (Number(c.paidAmount) || 0), 0);
-    const totalPending = totalWonCost - totalCollected;
+    const totalPending = Math.max(0, totalWonCost - totalCollected);
 
     // Services distribution
     const serviceDistribution = {};
@@ -67,6 +100,10 @@ export async function GET() {
         totalLeads: leads.length,
         totalOutreach: outreach.length,
         totalClients: clients.length,
+        totalSuccessfulClients: successfulClients.length,
+        dueTodayCount: dueTodayFollowUps.length,
+        overdueCount: overdueFollowUps.length,
+        upcomingCount: upcomingFollowUps.length,
         dueTodayFollowUps,
         overdueFollowUps,
         upcomingFollowUps,
@@ -75,7 +112,7 @@ export async function GET() {
           totalAskingCost,
           totalWonCost,
           totalCollected,
-          totalPending: Math.max(0, totalPending),
+          totalPending,
         },
         serviceDistribution,
       },
@@ -85,4 +122,3 @@ export async function GET() {
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }
 }
-

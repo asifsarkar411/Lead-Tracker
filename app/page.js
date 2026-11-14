@@ -8,13 +8,14 @@ import DashboardOverview from '@/components/DashboardOverview';
 import LeadsView from '@/components/LeadsView';
 import OutreachView from '@/components/OutreachView';
 import ClientsView from '@/components/ClientsView';
+import ClientListView from '@/components/ClientListView';
 import AdminSettingsView from '@/components/AdminSettingsView';
 import LeadModal from '@/components/LeadModal';
 import ClientModal from '@/components/ClientModal';
 import ReminderNoticeModal from '@/components/ReminderNoticeModal';
 
 export default function Home() {
-  const { activeTab, setActiveTab, isAdminModalOpen, setIsAdminModalOpen } = useApp();
+  const { activeTab, setActiveTab } = useApp();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   return (
@@ -36,14 +37,15 @@ export default function Home() {
           {activeTab === 'leads' && <LeadsView />}
           {activeTab === 'outreach' && <OutreachView />}
           {activeTab === 'clients' && <ClientsView />}
+          {activeTab === 'client-list' && <ClientListView />}
           {activeTab === 'reminders' && (
             <div className="space-y-4">
-              <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30">
-                <h3 className="text-base font-bold text-amber-700 dark:text-amber-300">
-                  Follow-up Notices & Alarms
+              <div className="p-4 rounded-3xl bg-red-500/10 border border-red-500/30">
+                <h3 className="text-base font-bold text-red-700 dark:text-red-300">
+                  Client Follow-up Notice Center
                 </h3>
-                <p className="text-xs text-amber-800/80 dark:text-amber-300/80">
-                  Manage all client follow-ups due today, overdue notices, and upcoming contacts.
+                <p className="text-xs text-red-800/80 dark:text-red-300/80">
+                  Real-time alerts for overdue, today, and upcoming client follow-ups.
                 </p>
               </div>
               <DashboardOverview />
@@ -58,25 +60,6 @@ export default function Home() {
       <ClientModal />
       <ReminderNoticeModal />
 
-      {/* Admin Panel Floating Modal (when triggered from top navbar button) */}
-      {isAdminModalOpen && (
-        <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/70 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in">
-          <div className="relative w-full max-w-4xl rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xl p-6 my-8 max-h-[85vh] overflow-y-auto">
-            <div className="flex justify-between items-center mb-4 pb-2 border-b border-slate-100 dark:border-slate-800">
-              <h3 className="text-lg font-bold">Admin Control Center</h3>
-              <button
-                onClick={() => setIsAdminModalOpen(false)}
-                className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 text-sm font-semibold"
-              >
-                ✕ Close
-              </button>
-            </div>
-            <AdminSettingsView />
-          </div>
-        </div>
-      )}
-
     </div>
   );
 }
-

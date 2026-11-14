@@ -8,32 +8,26 @@ import {
   Plus, 
   Trash2, 
   Image as ImageIcon, 
-  Database, 
   CheckCircle, 
   AlertCircle, 
   Globe, 
   MessageSquare, 
-  DollarSign, 
-  ExternalLink,
   Sparkles,
-  RefreshCw
+  Link2,
+  Phone
 } from 'lucide-react';
 
 export default function AdminSettingsView() {
   const { 
     settings, 
     saveSettings, 
-    dbStatus, 
-    refreshAllData,
-    theme,
-    toggleTheme
+    refreshAllData 
   } = useApp();
 
   const [formData, setFormData] = useState({
     siteName: '',
     tagline: '',
     logoUrl: '',
-    currencySymbol: '$',
     agencyPhone: '',
     agencyEmail: '',
     services: [],
@@ -48,11 +42,10 @@ export default function AdminSettingsView() {
   useEffect(() => {
     if (settings) {
       setFormData({
-        siteName: settings.siteName || 'ApexLead Growth CRM',
-        tagline: settings.tagline || 'High-Converting Digital Agency Sales & WhatsApp Leads Tracker',
+        siteName: settings.siteName || 'Lead Tracker',
+        tagline: settings.tagline || 'Agency Sales & WhatsApp Leads Tracker',
         logoUrl: settings.logoUrl || '',
-        currencySymbol: settings.currencySymbol || '$',
-        agencyPhone: settings.agencyPhone || '+1 234 567 8900',
+        agencyPhone: settings.agencyPhone || '+8801700000000',
         agencyEmail: settings.agencyEmail || 'sales@agency.com',
         services: settings.services || [],
         whatsappTemplates: settings.whatsappTemplates || [],
@@ -113,11 +106,18 @@ export default function AdminSettingsView() {
     setSaveSuccess(false);
     setErrorMessage('');
 
-    const res = await saveSettings(formData);
+    // Ensure currency remains ৳ (BDT)
+    const payload = {
+      ...formData,
+      currencySymbol: '৳'
+    };
+
+    const res = await saveSettings(payload);
     setIsSaving(false);
 
     if (res.success) {
       setSaveSuccess(true);
+      await refreshAllData();
       setTimeout(() => setSaveSuccess(false), 3000);
     } else {
       setErrorMessage(res.error || 'Failed to save settings.');
@@ -125,17 +125,20 @@ export default function AdminSettingsView() {
   };
 
   return (
-    <div className="space-y-6 max-w-5xl mx-auto">
+    <div className="space-y-6 max-w-4xl mx-auto pb-8">
       
-      {/* Header */}
+      {/* Top Header */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
           <h2 className="text-xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
             <Settings className="w-5 h-5 text-emerald-500" />
-            <span>Admin Control Panel & Dynamic Frontend</span>
+            <span>Admin Control Panel</span>
+            <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 font-bold">
+              Dynamic Controls
+            </span>
           </h2>
           <p className="text-xs text-slate-500 dark:text-slate-400">
-            Control website branding, logo, services list, WhatsApp templates, and MongoDB Atlas database connection.
+            Control website branding, logo image, services portfolio, and WhatsApp follow-up templates dynamically.
           </p>
         </div>
 
@@ -145,14 +148,14 @@ export default function AdminSettingsView() {
           className="flex items-center gap-2 px-5 py-2.5 text-xs font-bold rounded-xl text-white bg-emerald-600 hover:bg-emerald-500 shadow-md shadow-emerald-600/20 active:scale-95 transition-all disabled:opacity-50"
         >
           <Save className="w-4 h-4" />
-          <span>{isSaving ? 'Saving Updates...' : 'Save All Changes'}</span>
+          <span>{isSaving ? 'Saving Changes...' : 'Save All Changes'}</span>
         </button>
       </div>
 
       {saveSuccess && (
         <div className="p-4 rounded-2xl bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800 text-emerald-800 dark:text-emerald-300 text-xs flex items-center gap-2 animate-in fade-in">
           <CheckCircle className="w-4 h-4 text-emerald-500 flex-shrink-0" />
-          <span>Website settings and dynamic frontend controls updated successfully!</span>
+          <span>Website branding, logo and service controls saved and updated across the frontend!</span>
         </div>
       )}
 
@@ -165,26 +168,25 @@ export default function AdminSettingsView() {
 
       {/* Section 1: Website Branding & Logo */}
       <div className="p-6 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm space-y-5">
-        <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
-          <div>
-            <h3 className="font-bold text-sm text-slate-900 dark:text-white flex items-center gap-2">
-              <Globe className="w-4 h-4 text-emerald-500" />
-              Website Branding & Logo Control
-            </h3>
-            <p className="text-xs text-slate-500 dark:text-slate-400">
-              Customize the name, tagline, and logo shown across the entire application.
-            </p>
-          </div>
+        <div className="border-b border-slate-100 dark:border-slate-800 pb-3">
+          <h3 className="font-bold text-sm text-slate-900 dark:text-white flex items-center gap-2">
+            <Globe className="w-4 h-4 text-emerald-500" />
+            Website Branding & Logo Settings
+          </h3>
+          <p className="text-xs text-slate-500 dark:text-slate-400">
+            Changes made here reflect immediately on the frontend header, title, and branding.
+          </p>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
             <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-              Website / Agency Name *
+              Website / Brand Name *
             </label>
             <input
               type="text"
               required
+              placeholder="e.g. Lead Tracker / Agency CRM"
               value={formData.siteName}
               onChange={(e) => setFormData({ ...formData, siteName: e.target.value })}
               className="w-full px-3.5 py-2 text-sm font-semibold rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
@@ -193,23 +195,12 @@ export default function AdminSettingsView() {
 
           <div>
             <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-              Currency Symbol
+              Currency
             </label>
-            <select
-              value={formData.currencySymbol}
-              onChange={(e) => setFormData({ ...formData, currencySymbol: e.target.value })}
-              className="w-full px-3.5 py-2 text-sm font-semibold rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
-            >
-              <option value="$">$ (USD - United States Dollar)</option>
-              <option value="৳">৳ (BDT - Bangladeshi Taka)</option>
-              <option value="₹">₹ (INR - Indian Rupee)</option>
-              <option value="£">£ (GBP - British Pound)</option>
-              <option value="€">€ (EUR - Euro)</option>
-              <option value="AED">AED (United Arab Emirates Dirham)</option>
-              <option value="C$">C$ (CAD - Canadian Dollar)</option>
-              <option value="A$">A$ (AUD - Australian Dollar)</option>
-              <option value="SAR">SAR (Saudi Riyal)</option>
-            </select>
+            <div className="w-full px-3.5 py-2 text-sm font-bold rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800/80 text-emerald-600 dark:text-emerald-400 flex items-center justify-between">
+              <span>৳ (BDT - Bangladeshi Taka)</span>
+              <span className="text-[10px] uppercase font-bold text-slate-400">Standard</span>
+            </div>
           </div>
 
           <div className="sm:col-span-2">
@@ -218,6 +209,7 @@ export default function AdminSettingsView() {
             </label>
             <input
               type="text"
+              placeholder="e.g. Digital Agency Sales & WhatsApp Leads Tracker"
               value={formData.tagline}
               onChange={(e) => setFormData({ ...formData, tagline: e.target.value })}
               className="w-full px-3.5 py-2 text-sm rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
@@ -226,25 +218,25 @@ export default function AdminSettingsView() {
 
           <div className="sm:col-span-2">
             <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-              Custom Logo Image URL (Optional)
+              Website Logo URL
             </label>
             <div className="flex gap-3 items-center">
               <input
                 type="url"
-                placeholder="https://example.com/your-agency-logo.png"
+                placeholder="https://example.com/logo.png"
                 value={formData.logoUrl}
                 onChange={(e) => setFormData({ ...formData, logoUrl: e.target.value })}
                 className="flex-1 px-3.5 py-2 text-sm rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
               />
               {formData.logoUrl && (
-                <div className="w-10 h-10 p-1 border rounded-xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center">
+                <div className="w-10 h-10 p-1 border rounded-xl bg-white dark:bg-slate-800 flex items-center justify-center">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src={formData.logoUrl} alt="Logo Preview" className="max-h-full max-w-full object-contain" />
                 </div>
               )}
             </div>
             <p className="text-[11px] text-slate-400 mt-1">
-              Leave blank to use the modern default gradient icon badge.
+              Enter any direct image link for your agency logo. If left blank, the modern ৳ badge will be used.
             </p>
           </div>
 
@@ -254,6 +246,7 @@ export default function AdminSettingsView() {
             </label>
             <input
               type="text"
+              placeholder="+8801700000000"
               value={formData.agencyPhone}
               onChange={(e) => setFormData({ ...formData, agencyPhone: e.target.value })}
               className="w-full px-3.5 py-2 text-sm font-mono rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white"
@@ -266,6 +259,7 @@ export default function AdminSettingsView() {
             </label>
             <input
               type="email"
+              placeholder="sales@agency.com"
               value={formData.agencyEmail}
               onChange={(e) => setFormData({ ...formData, agencyEmail: e.target.value })}
               className="w-full px-3.5 py-2 text-sm rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white"
@@ -276,26 +270,23 @@ export default function AdminSettingsView() {
 
       {/* Section 2: Dynamic Agency Services Manager */}
       <div className="p-6 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm space-y-4">
-        <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
-          <div>
-            <h3 className="font-bold text-sm text-slate-900 dark:text-white flex items-center gap-2">
-              <Sparkles className="w-4 h-4 text-emerald-500" />
-              Dynamic Agency Services Manager ({formData.services.length})
-            </h3>
-            <p className="text-xs text-slate-500 dark:text-slate-400">
-              Add or remove services offered by your agency (e.g. Website development, SEO, Paid ads, GBP). These dynamically update all forms and filters!
-            </p>
-          </div>
+        <div className="border-b border-slate-100 dark:border-slate-800 pb-3">
+          <h3 className="font-bold text-sm text-slate-900 dark:text-white flex items-center gap-2">
+            <Sparkles className="w-4 h-4 text-emerald-500" />
+            Dynamic Agency Services Manager ({formData.services.length})
+          </h3>
+          <p className="text-xs text-slate-500 dark:text-slate-400">
+            Add or remove services offered by your agency. Updates all lead intake forms and filters dynamically.
+          </p>
         </div>
 
-        {/* Existing Services List */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
           {formData.services.map((srv) => (
             <div
               key={srv}
               className="flex items-center justify-between p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700/80 text-xs"
             >
-              <span className="font-semibold text-slate-800 dark:text-slate-200">
+              <span className="font-semibold text-slate-800 dark:text-slate-200 truncate pr-2">
                 {srv}
               </span>
               <button
@@ -310,11 +301,10 @@ export default function AdminSettingsView() {
           ))}
         </div>
 
-        {/* Add New Service Input */}
         <div className="flex gap-2 pt-2">
           <input
             type="text"
-            placeholder="e.g. Mobile App Development, AI Chatbot Setup, TikTok Ads..."
+            placeholder="e.g. Mobile App Development, Shopify Store Setup, AI Chatbots..."
             value={newServiceName}
             onChange={(e) => setNewServiceName(e.target.value)}
             className="flex-1 px-3.5 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
@@ -336,10 +326,10 @@ export default function AdminSettingsView() {
           <div>
             <h3 className="font-bold text-sm text-slate-900 dark:text-white flex items-center gap-2">
               <MessageSquare className="w-4 h-4 text-emerald-500" />
-              Dynamic WhatsApp Follow-Up Templates
+              WhatsApp Quick Message Templates
             </h3>
             <p className="text-xs text-slate-500 dark:text-slate-400">
-              Customize 1-click WhatsApp messaging templates. Variables available: <code>{`{name}`}</code>, <code>{`{service}`}</code>
+              Customize 1-click WhatsApp follow-up messages. Tags: <code>{`{name}`}</code>, <code>{`{service}`}</code>
             </p>
           </div>
 
@@ -385,61 +375,6 @@ export default function AdminSettingsView() {
         </div>
       </div>
 
-      {/* Section 4: MongoDB Atlas Connection & Vercel Live Deployment */}
-      <div className="p-6 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm space-y-4">
-        <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
-          <div className="flex items-center gap-2">
-            <Database className="w-5 h-5 text-emerald-500" />
-            <div>
-              <h3 className="font-bold text-sm text-slate-900 dark:text-white">
-                MongoDB Atlas & Vercel Deployment Status
-              </h3>
-              <p className="text-xs text-slate-500 dark:text-slate-400">
-                Deploy live to Vercel via GitHub with persistent MongoDB Atlas storage.
-              </p>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold ${
-              dbStatus.isMongoConnected
-                ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 border border-emerald-300'
-                : 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300 border border-amber-300'
-            }`}>
-              <span className={`h-2 w-2 rounded-full ${dbStatus.isMongoConnected ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'}`} />
-              {dbStatus.isMongoConnected ? 'MongoDB Atlas Connected' : 'Demo Mode (Atlas Ready)'}
-            </span>
-
-            <button
-              type="button"
-              onClick={refreshAllData}
-              className="p-1.5 rounded-lg text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800"
-              title="Refresh connection status"
-            >
-              <RefreshCw className="w-4 h-4" />
-            </button>
-          </div>
-        </div>
-
-        <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200/60 dark:border-slate-700/60 space-y-3 text-xs">
-          <h4 className="font-bold text-slate-900 dark:text-white">
-            Quick MongoDB Atlas Connection Guide:
-          </h4>
-          <ol className="list-decimal pl-4 space-y-1.5 text-slate-600 dark:text-slate-300">
-            <li>Log in to <a href="https://cloud.mongodb.com" target="_blank" rel="noreferrer" className="text-emerald-600 dark:text-emerald-400 font-semibold underline">MongoDB Atlas</a> and create a free Shared (M0) Cluster.</li>
-            <li>Under <strong>Database Access</strong>, add a user (e.g. <code>leadAdmin</code>) with password.</li>
-            <li>Under <strong>Network Access</strong>, add IP Address <code>0.0.0.0/0</code> (Allow Access from Anywhere for Vercel).</li>
-            <li>Click <strong>Connect</strong> &gt; <strong>Drivers</strong> &gt; Copy your connection string:
-              <pre className="mt-1 p-2 rounded-lg bg-slate-900 text-emerald-400 font-mono text-[11px] overflow-x-auto">
-                MONGODB_URI=mongodb+srv://&lt;username&gt;:&lt;password&gt;@cluster0.xxxxx.mongodb.net/leadtracker?retryWrites=true&amp;w=majority
-              </pre>
-            </li>
-            <li>Add <code>MONGODB_URI</code> to your local <code>.env.local</code> file or to your <strong>Vercel Project &gt; Settings &gt; Environment Variables</strong> when deploying!</li>
-          </ol>
-        </div>
-      </div>
-
     </div>
   );
 }
-

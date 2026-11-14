@@ -9,11 +9,13 @@ import {
   Plus, 
   Settings, 
   Search, 
-  MessageSquare, 
   Layers, 
   AlertCircle,
   Menu,
-  X
+  Phone,
+  Send,
+  Calendar,
+  Clock
 } from 'lucide-react';
 
 export default function Navbar({ onMobileMenuToggle }) {
@@ -22,14 +24,13 @@ export default function Navbar({ onMobileMenuToggle }) {
     toggleTheme, 
     settings, 
     totalNoticeCount, 
-    dueFollowUps,
-    dueOutreachFollowUps,
+    allFollowUpNotices,
     setIsLeadModalOpen, 
     setEditingLead,
     setIsReminderModalOpen,
-    setIsAdminModalOpen,
     searchTerm,
     setSearchTerm,
+    activeTab,
     setActiveTab,
     playNotificationChime
   } = useApp();
@@ -47,17 +48,23 @@ export default function Navbar({ onMobileMenuToggle }) {
     setIsNoticeDropdownOpen(false);
   };
 
+  const handleOpenWhatsApp = (phone, name) => {
+    const clean = phone.replace(/[^0-9]/g, '');
+    const msg = `Hello ${name || 'there'}! Following up from our team. How are you doing today?`;
+    window.open(`https://wa.me/${clean}?text=${encodeURIComponent(msg)}`, '_blank');
+  };
+
   return (
-    <header className="sticky top-0 z-40 w-full backdrop-blur-md bg-white/80 dark:bg-slate-900/80 border-b border-slate-200 dark:border-slate-800 transition-colors duration-200">
+    <header className="sticky top-0 z-40 w-full backdrop-blur-md bg-white/90 dark:bg-slate-900/90 border-b border-slate-200 dark:border-slate-800 transition-colors duration-200">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16 gap-4">
           
-          {/* Left Brand & Mobile Menu */}
+          {/* Left: Brand Logo & Website Name */}
           <div className="flex items-center gap-3">
             <button
               type="button"
               onClick={onMobileMenuToggle}
-              className="lg:hidden p-2 rounded-lg text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
+              className="lg:hidden p-2 rounded-xl text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
             >
               <Menu className="w-5 h-5" />
             </button>
@@ -70,23 +77,23 @@ export default function Navbar({ onMobileMenuToggle }) {
                 // eslint-disable-next-line @next/next/no-img-element
                 <img 
                   src={settings.logoUrl} 
-                  alt={settings.siteName} 
-                  className="w-9 h-9 object-contain rounded-lg"
+                  alt={settings.siteName || 'Agency Logo'} 
+                  className="w-9 h-9 object-contain rounded-xl border border-slate-200 dark:border-slate-700 bg-white"
                 />
               ) : (
-                <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-emerald-500 to-teal-400 flex items-center justify-center text-white shadow-md shadow-emerald-500/20 group-hover:scale-105 transition-transform">
-                  <Layers className="w-5 h-5" />
+                <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-emerald-600 to-teal-500 flex items-center justify-center text-white shadow-md shadow-emerald-600/20 group-hover:scale-105 transition-transform">
+                  <span className="font-extrabold text-sm">৳</span>
                 </div>
               )}
               <div>
-                <h1 className="font-bold text-lg leading-tight tracking-tight text-slate-900 dark:text-white flex items-center gap-2">
-                  {settings.siteName || 'ApexLead Tracker'}
-                  <span className="hidden sm:inline-block px-2 py-0.5 text-[10px] font-semibold bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 rounded-full border border-emerald-300 dark:border-emerald-800">
-                    Live CRM
+                <h1 className="font-bold text-base sm:text-lg leading-tight tracking-tight text-slate-900 dark:text-white flex items-center gap-2">
+                  <span>{settings.siteName || 'Lead Tracker'}</span>
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800">
+                    ৳ BDT
                   </span>
                 </h1>
                 <p className="text-xs text-slate-500 dark:text-slate-400 hidden sm:block truncate max-w-xs">
-                  {settings.tagline || 'Sales & WhatsApp Leads Management'}
+                  {settings.tagline || 'Sales & WhatsApp Leads Tracker'}
                 </p>
               </div>
             </div>
@@ -98,15 +105,15 @@ export default function Navbar({ onMobileMenuToggle }) {
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
               <input
                 type="text"
-                placeholder="Search leads by name, phone, service or requirements..."
+                placeholder="Search leads, phones, requirements, clients..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-9 pr-4 py-2 text-sm rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/60 text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500 transition-all"
+                className="w-full pl-9 pr-4 py-2 text-xs font-medium rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/80 text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
               />
               {searchTerm && (
                 <button 
                   onClick={() => setSearchTerm('')} 
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 text-xs"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-xs font-semibold"
                 >
                   Clear
                 </button>
@@ -120,13 +127,13 @@ export default function Navbar({ onMobileMenuToggle }) {
             {/* Quick Add WhatsApp Lead Button */}
             <button
               onClick={handleOpenNewLead}
-              className="flex items-center gap-1.5 px-3 py-2 text-xs sm:text-sm font-medium rounded-xl text-white bg-emerald-600 hover:bg-emerald-500 shadow-md shadow-emerald-600/20 active:scale-95 transition-all"
+              className="flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold rounded-xl text-white bg-emerald-600 hover:bg-emerald-500 shadow-md shadow-emerald-600/20 active:scale-95 transition-all"
             >
               <Plus className="w-4 h-4" />
               <span className="hidden sm:inline">Add Lead</span>
             </button>
 
-            {/* Notification Bell with Dropdown & Audio Chime */}
+            {/* Notification Bell with Dropdown & Accurate Client Info */}
             <div className="relative">
               <button
                 type="button"
@@ -144,77 +151,63 @@ export default function Navbar({ onMobileMenuToggle }) {
                 )}
               </button>
 
-              {/* Notification Popover Dropdown */}
+              {/* Notification Popover */}
               {isNoticeDropdownOpen && (
                 <div className="absolute right-0 mt-2 w-80 sm:w-96 rounded-2xl shadow-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 py-3 px-4 z-50 animate-in fade-in zoom-in-95 duration-150">
                   <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
                     <div className="flex items-center gap-2">
                       <AlertCircle className="w-4 h-4 text-amber-500" />
-                      <h4 className="font-semibold text-sm text-slate-900 dark:text-white">
+                      <h4 className="font-bold text-xs text-slate-900 dark:text-white">
                         Follow-up Notices ({totalNoticeCount})
                       </h4>
                     </div>
                     <button
                       onClick={handleOpenReminders}
-                      className="text-xs font-medium text-emerald-600 dark:text-emerald-400 hover:underline"
+                      className="text-xs font-bold text-emerald-600 dark:text-emerald-400 hover:underline"
                     >
                       View All
                     </button>
                   </div>
 
-                  <div className="py-2 max-h-64 overflow-y-auto space-y-2">
+                  <div className="py-2 max-h-72 overflow-y-auto space-y-2">
                     {totalNoticeCount === 0 ? (
-                      <p className="text-xs text-center py-6 text-slate-500 dark:text-slate-400">
-                        🎉 Awesome! All follow-up schedules are clear!
+                      <p className="text-xs text-center py-6 text-slate-400">
+                        🎉 All client follow-ups are up to date!
                       </p>
                     ) : (
-                      <>
-                        {dueFollowUps.slice(0, 4).map((lead) => (
-                          <div 
-                            key={lead._id}
-                            onClick={() => {
-                              setIsNoticeDropdownOpen(false);
-                              setIsReminderModalOpen(true);
-                            }}
-                            className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 hover:bg-emerald-50 dark:hover:bg-slate-800 cursor-pointer transition-colors border border-slate-200/60 dark:border-slate-700/60 flex items-center justify-between"
-                          >
-                            <div>
-                              <p className="text-xs font-semibold text-slate-900 dark:text-white">
-                                {lead.name}
-                              </p>
-                              <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                                WhatsApp Lead • Due: {lead.followUpDate} ({lead.followUpTime || '11:00'})
-                              </p>
-                            </div>
-                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-red-100 text-red-700 dark:bg-red-950/80 dark:text-red-300">
-                              Urgent
+                      allFollowUpNotices.slice(0, 5).map((notice) => (
+                        <div 
+                          key={notice._id}
+                          className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 hover:bg-emerald-50 dark:hover:bg-slate-800 border border-slate-200/60 dark:border-slate-700/60 transition-colors space-y-1.5"
+                        >
+                          <div className="flex items-center justify-between">
+                            <span className="font-bold text-xs text-slate-900 dark:text-white truncate">
+                              {notice.name}
+                            </span>
+                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                              notice.isOverdue 
+                                ? 'bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-300 animate-pulse'
+                                : 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300'
+                            }`}>
+                              {notice.isOverdue ? 'Overdue' : 'Due Today'}
                             </span>
                           </div>
-                        ))}
 
-                        {dueOutreachFollowUps.slice(0, 2).map((lead) => (
-                          <div 
-                            key={lead._id}
-                            onClick={() => {
-                              setIsNoticeDropdownOpen(false);
-                              setIsReminderModalOpen(true);
-                            }}
-                            className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 hover:bg-emerald-50 dark:hover:bg-slate-800 cursor-pointer transition-colors border border-slate-200/60 dark:border-slate-700/60 flex items-center justify-between"
-                          >
-                            <div>
-                              <p className="text-xs font-semibold text-slate-900 dark:text-white">
-                                {lead.name} ({lead.company || 'Outreach'})
-                              </p>
-                              <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                                Cold Outreach • Due: {lead.followUpDate}
-                              </p>
-                            </div>
-                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 dark:bg-amber-950/80 dark:text-amber-300">
-                              Outreach
+                          <div className="flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400 font-mono">
+                            <span className="flex items-center gap-1">
+                              <Calendar className="w-3 h-3 text-slate-400" />
+                              {notice.followUpDate} • {notice.followUpTime}
                             </span>
+                            <button
+                              onClick={() => handleOpenWhatsApp(notice.phone, notice.name)}
+                              className="text-emerald-600 dark:text-emerald-400 hover:underline flex items-center gap-1 font-semibold"
+                            >
+                              <Send className="w-3 h-3" />
+                              WhatsApp
+                            </button>
                           </div>
-                        ))}
-                      </>
+                        </div>
+                      ))
                     )}
                   </div>
 
@@ -227,9 +220,9 @@ export default function Navbar({ onMobileMenuToggle }) {
                     </button>
                     <button
                       onClick={handleOpenReminders}
-                      className="w-full text-center py-1.5 text-xs font-semibold rounded-lg bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300 hover:bg-emerald-100 dark:hover:bg-emerald-900/60 transition-colors"
+                      className="text-center py-1.5 px-3 text-xs font-bold rounded-lg bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 hover:bg-emerald-100 transition-colors"
                     >
-                      Open Reminder Notice Center
+                      Open Notice Center
                     </button>
                   </div>
                 </div>
@@ -246,12 +239,14 @@ export default function Navbar({ onMobileMenuToggle }) {
               {theme === 'dark' ? <Sun className="w-5 h-5 text-amber-400" /> : <Moon className="w-5 h-5 text-slate-700" />}
             </button>
 
-            {/* Admin Panel Button */}
+            {/* Admin Panel Direct Button */}
             <button
               type="button"
-              onClick={() => setIsAdminModalOpen(true)}
-              className="p-2 rounded-xl text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
-              title="Admin Settings & Dynamic Controls"
+              onClick={() => setActiveTab('admin')}
+              className={`p-2 rounded-xl text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors ${
+                activeTab === 'admin' ? 'bg-emerald-50 text-emerald-600 dark:bg-slate-800' : ''
+              }`}
+              title="Admin Panel"
             >
               <Settings className="w-5 h-5" />
             </button>
@@ -262,4 +257,3 @@ export default function Navbar({ onMobileMenuToggle }) {
     </header>
   );
 }
-

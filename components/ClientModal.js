@@ -8,7 +8,9 @@ import {
   Briefcase, 
   DollarSign, 
   Calendar, 
-  AlertCircle 
+  AlertCircle,
+  Percent,
+  CheckCircle2
 } from 'lucide-react';
 
 export default function ClientModal() {
@@ -26,48 +28,49 @@ export default function ClientModal() {
     phone: '',
     email: '',
     services: [],
-    askingCost: 0,
-    wonCost: 0,
-    paidAmount: 0,
+    askingCost: '', // Strictly starts blank as requested
+    wonCost: '',    // Strictly starts blank as requested
+    paidAmount: '', // Strictly starts blank as requested
     paymentStatus: 'Pending',
     clientStatus: 'Active',
     contractDuration: 'Monthly Retainer',
     startDate: new Date().toISOString().split('T')[0],
-    deliveryDate: new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0],
+    deliveryDate: '',
     notes: '',
   });
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
 
-  const currency = settings.currencySymbol || '$';
+  const currency = '৳';
 
   useEffect(() => {
     if (editingClient) {
       setFormData({
         ...editingClient,
         services: editingClient.services || [],
-        askingCost: Number(editingClient.askingCost) || 0,
-        wonCost: Number(editingClient.wonCost) || 0,
-        paidAmount: Number(editingClient.paidAmount) || 0,
+        askingCost: editingClient.askingCost !== undefined && editingClient.askingCost !== null ? String(editingClient.askingCost) : '',
+        wonCost: editingClient.wonCost !== undefined && editingClient.wonCost !== null ? String(editingClient.wonCost) : '',
+        paidAmount: editingClient.paidAmount !== undefined && editingClient.paidAmount !== null ? String(editingClient.paidAmount) : '',
         startDate: editingClient.startDate || new Date().toISOString().split('T')[0],
         deliveryDate: editingClient.deliveryDate || '',
       });
     } else {
+      // Clean blank state for new client
       setFormData({
         clientName: '',
         businessName: '',
         phone: '',
         email: '',
         services: ['Website Development'],
-        askingCost: 2000,
-        wonCost: 1800,
-        paidAmount: 0,
+        askingCost: '', // Blank
+        wonCost: '',    // Blank
+        paidAmount: '', // Blank
         paymentStatus: 'Pending',
         clientStatus: 'Active',
         contractDuration: 'Monthly Retainer',
         startDate: new Date().toISOString().split('T')[0],
-        deliveryDate: new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0],
+        deliveryDate: '',
         notes: '',
       });
     }
@@ -87,6 +90,14 @@ export default function ClientModal() {
     });
   };
 
+  // Accurate live calculations
+  const numAsking = Number(formData.askingCost) || 0;
+  const numWon = Number(formData.wonCost) || 0;
+  const numPaid = Number(formData.paidAmount) || 0;
+  const numDue = Math.max(0, numWon - numPaid);
+  const numDiscount = numAsking > numWon && numAsking > 0 ? numAsking - numWon : 0;
+  const discountPercent = numAsking > 0 ? Math.round((numDiscount / numAsking) * 100) : 0;
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!formData.clientName.trim() || !formData.phone.trim()) {
@@ -97,7 +108,27 @@ export default function ClientModal() {
     setIsSubmitting(true);
     setErrorMessage('');
 
-    const res = await saveClient(formData);
+    // Determine accurate payment status
+    let calculatedPaymentStatus = formData.paymentStatus;
+    if (numWon > 0) {
+      if (numPaid >= numWon) {
+        calculatedPaymentStatus = 'Paid';
+      } else if (numPaid > 0) {
+        calculatedPaymentStatus = 'Partial';
+      } else {
+        calculatedPaymentStatus = 'Pending';
+      }
+    }
+
+    const payload = {
+      ...formData,
+      askingCost: numAsking,
+      wonCost: numWon,
+      paidAmount: numPaid,
+      paymentStatus: calculatedPaymentStatus
+    };
+
+    const res = await saveClient(payload);
     setIsSubmitting(false);
 
     if (res.success) {
@@ -119,7 +150,7 @@ export default function ClientModal() {
               <span>{editingClient?._id ? 'Edit Onboarded Client' : 'Onboard New Client'}</span>
             </h3>
             <p className="text-xs text-slate-500 dark:text-slate-400">
-              Manage agreed services, asking vs won deal costs, payment realization and delivery status.
+              Manage agreed services, deal pricing in BDT (৳), payments and project milestones.
             </p>
           </div>
           
@@ -149,10 +180,10 @@ export default function ClientModal() {
               <input
                 type="text"
                 required
-                placeholder="e.g. Tariq Mansoor"
+                placeholder="e.g. Asif Mahmud"
                 value={formData.clientName}
                 onChange={(e) => setFormData({ ...formData, clientName: e.target.value })}
-                className="w-full px-3.5 py-2 text-sm rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white"
+                className="w-full px-3.5 py-2 text-sm rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-purple-500/50"
               />
             </div>
 
@@ -162,10 +193,10 @@ export default function ClientModal() {
               </label>
               <input
                 type="text"
-                placeholder="e.g. Oasis Auto Spa"
+                placeholder="e.g. Tech Solution BD"
                 value={formData.businessName}
                 onChange={(e) => setFormData({ ...formData, businessName: e.target.value })}
-                className="w-full px-3.5 py-2 text-sm rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white"
+                className="w-full px-3.5 py-2 text-sm rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-purple-500/50"
               />
             </div>
 
@@ -176,10 +207,10 @@ export default function ClientModal() {
               <input
                 type="tel"
                 required
-                placeholder="+971529998877"
+                placeholder="+8801700000000"
                 value={formData.phone}
                 onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                className="w-full px-3.5 py-2 text-sm font-mono rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white"
+                className="w-full px-3.5 py-2 text-sm font-mono rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-purple-500/50"
               />
             </div>
 
@@ -189,10 +220,10 @@ export default function ClientModal() {
               </label>
               <input
                 type="email"
-                placeholder="tariq@business.com"
+                placeholder="client@company.com"
                 value={formData.email}
                 onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                className="w-full px-3.5 py-2 text-sm rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white"
+                className="w-full px-3.5 py-2 text-sm rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-purple-500/50"
               />
             </div>
           </div>
@@ -223,14 +254,15 @@ export default function ClientModal() {
             </div>
           </div>
 
-          {/* Asking Cost vs Won Cost & Payment */}
+          {/* Financial & Cost Controls with BLANK fields and ACCURATE live calculation */}
           <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200/80 dark:border-slate-700/80 space-y-4">
             <h4 className="text-xs font-bold text-slate-900 dark:text-white uppercase tracking-wider flex items-center gap-1.5">
-              <DollarSign className="w-4 h-4 text-purple-500" />
-              Financial & Cost Controls
+              <span className="font-extrabold text-sm text-purple-600">৳</span>
+              Financial Deal Controls (in BDT ৳)
             </h4>
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              {/* Asking Cost */}
               <div>
                 <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1">
                   Asking Cost ({currency})
@@ -238,50 +270,77 @@ export default function ClientModal() {
                 <input
                   type="number"
                   min="0"
+                  placeholder="Enter asking price..."
                   value={formData.askingCost}
-                  onChange={(e) => setFormData({ ...formData, askingCost: Number(e.target.value) })}
-                  className="w-full px-3 py-2 text-xs font-bold rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white"
+                  onChange={(e) => setFormData({ ...formData, askingCost: e.target.value })}
+                  className="w-full px-3 py-2 text-xs font-bold rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-purple-500/50"
                 />
               </div>
 
+              {/* Won Deal Cost */}
               <div>
-                <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1">
+                <label className="block text-[11px] font-semibold text-purple-600 dark:text-purple-400 mb-1">
                   Won Deal Cost ({currency}) *
                 </label>
                 <input
                   type="number"
                   min="0"
-                  required
+                  placeholder="Enter agreed won price..."
                   value={formData.wonCost}
-                  onChange={(e) => setFormData({ ...formData, wonCost: Number(e.target.value) })}
-                  className="w-full px-3 py-2 text-xs font-bold rounded-xl border border-purple-300 dark:border-purple-600 bg-purple-50/50 dark:bg-purple-950/40 text-purple-700 dark:text-purple-300"
+                  onChange={(e) => setFormData({ ...formData, wonCost: e.target.value })}
+                  className="w-full px-3 py-2 text-xs font-bold rounded-xl border border-purple-300 dark:border-purple-600 bg-purple-50/50 dark:bg-purple-950/40 text-purple-700 dark:text-purple-300 focus:outline-none focus:ring-2 focus:ring-purple-500/50"
                 />
               </div>
 
+              {/* Paid Amount */}
               <div>
-                <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1">
+                <label className="block text-[11px] font-semibold text-emerald-600 dark:text-emerald-400 mb-1">
                   Paid Amount ({currency})
                 </label>
                 <input
                   type="number"
                   min="0"
+                  placeholder="Enter received amount..."
                   value={formData.paidAmount}
-                  onChange={(e) => {
-                    const paid = Number(e.target.value);
-                    let pStatus = formData.paymentStatus;
-                    if (paid >= formData.wonCost && formData.wonCost > 0) {
-                      pStatus = 'Paid';
-                    } else if (paid > 0) {
-                      pStatus = 'Partial';
-                    }
-                    setFormData({ ...formData, paidAmount: paid, paymentStatus: pStatus });
-                  }}
-                  className="w-full px-3 py-2 text-xs font-bold rounded-xl border border-emerald-300 dark:border-emerald-600 bg-emerald-50/50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300"
+                  onChange={(e) => setFormData({ ...formData, paidAmount: e.target.value })}
+                  className="w-full px-3 py-2 text-xs font-bold rounded-xl border border-emerald-300 dark:border-emerald-600 bg-emerald-50/50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
                 />
               </div>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {/* Accurate Live Calculation Summary Badges */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1 text-xs">
+              <div className="p-2.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
+                <span className="text-[10px] text-slate-400 block font-medium">Deal Price (Won):</span>
+                <span className="font-bold text-slate-900 dark:text-white">
+                  {currency} {numWon.toLocaleString()}
+                </span>
+              </div>
+
+              <div className="p-2.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
+                <span className="text-[10px] text-slate-400 block font-medium">Cash Collected:</span>
+                <span className="font-bold text-emerald-600 dark:text-emerald-400">
+                  {currency} {numPaid.toLocaleString()}
+                </span>
+              </div>
+
+              <div className="p-2.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
+                <span className="text-[10px] text-slate-400 block font-medium">Due Balance:</span>
+                <span className={`font-bold ${numDue > 0 ? 'text-amber-500' : 'text-emerald-500'}`}>
+                  {currency} {numDue.toLocaleString()}
+                </span>
+              </div>
+
+              <div className="p-2.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
+                <span className="text-[10px] text-slate-400 block font-medium">Discount Given:</span>
+                <span className="font-bold text-purple-600 dark:text-purple-400">
+                  {currency} {numDiscount.toLocaleString()} {discountPercent > 0 && `(${discountPercent}%)`}
+                </span>
+              </div>
+            </div>
+
+            {/* Payment & Client Status */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
               <div>
                 <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1">
                   Payment Status
@@ -291,9 +350,9 @@ export default function ClientModal() {
                   onChange={(e) => setFormData({ ...formData, paymentStatus: e.target.value })}
                   className="w-full px-3 py-2 text-xs font-semibold rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white"
                 >
-                  <option value="Paid">Paid in Full</option>
-                  <option value="Partial">Partial Deposit</option>
                   <option value="Pending">Pending Invoice</option>
+                  <option value="Partial">Partial Deposit</option>
+                  <option value="Paid">Paid in Full</option>
                   <option value="Overdue">Overdue Payment</option>
                   <option value="Refunded">Refunded</option>
                 </select>
@@ -301,7 +360,7 @@ export default function ClientModal() {
 
               <div>
                 <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1">
-                  Client Status
+                  Client Project Status
                 </label>
                 <select
                   value={formData.clientStatus}
@@ -367,7 +426,7 @@ export default function ClientModal() {
             </label>
             <textarea
               rows={2}
-              placeholder="e.g. Deposit paid via wire. Deliverables: 10 page responsive site + SEO keywords audit."
+              placeholder="Deliverables, payment methods (bKash/Nagad/Bank), project timeline..."
               value={formData.notes}
               onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
               className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white"
@@ -398,4 +457,3 @@ export default function ClientModal() {
     </div>
   );
 }
-
