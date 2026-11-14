@@ -15,3 +15,4 @@ const SuccessfulClientSchema = new mongoose.Schema({
 }, { timestamps: true });
 
 export default mongoose.models.SuccessfulClient || mongoose.model('SuccessfulClient', SuccessfulClientSchema);
+
