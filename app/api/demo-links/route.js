@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getDemoLinks, createDemoLink } from '@/lib/store';
+import { getDemoLinks, createDemoLink, importBatchDemoLinks } from '@/lib/store';
 
 export const dynamic = 'force-dynamic';
 
@@ -18,10 +18,25 @@ export async function GET(request) {
 export async function POST(request) {
   try {
     const body = await request.json();
-    if (!body.title || !body.url) {
-      return NextResponse.json({ success: false, error: 'Title and URL are required' }, { status: 400 });
+
+    if (Array.isArray(body)) {
+      if (body.length === 0) {
+        return NextResponse.json({ success: false, error: 'Empty batch provided' }, { status: 400 });
+      }
+      const created = await importBatchDemoLinks(body);
+      return NextResponse.json({ success: true, count: created.length, demoLinks: created }, { status: 201 });
     }
-    const created = await createDemoLink(body);
+
+    if (!body.title && !body.clientName) {
+      return NextResponse.json({ success: false, error: 'Title or Client Name is required' }, { status: 400 });
+    }
+
+    const payload = {
+      ...body,
+      title: body.title || body.clientName || 'Demo Link'
+    };
+
+    const created = await createDemoLink(payload);
     return NextResponse.json({ success: true, demoLink: created }, { status: 201 });
   } catch (error) {
     console.error('API Error in POST /api/demo-links:', error);

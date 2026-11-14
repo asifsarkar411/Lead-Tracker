@@ -2,62 +2,82 @@
 
 import React, { useState, useMemo } from 'react';
 import { useApp } from '@/context/AppContext';
-import DateFilterBar from './DateFilterBar';
-import { parseExcelOrCsvFile, exportToExcel, exportToCsv } from '@/lib/excelUtils';
+import DateFilterBar from '@/components/DateFilterBar';
 import { 
+  FileSpreadsheet, 
   Plus, 
   Search, 
-  Phone, 
-  Send, 
-  Calendar, 
-  Clock, 
-  FileText, 
-  Trash2, 
-  Edit3, 
-  UserCheck, 
   Download, 
   Upload, 
-  FileSpreadsheet,
-  Flame, 
-  CheckCircle,
+  Phone, 
+  MessageSquare, 
+  Calendar, 
+  Clock, 
+  Trash2, 
+  Edit3, 
+  CheckCircle2, 
   AlertCircle,
-  X,
-  FileUp
+  Copy,
+  ChevronDown,
+  UserCheck,
+  Flame,
+  Zap,
+  Moon,
+  ExternalLink,
+  PhoneCall,
+  PhoneOff
 } from 'lucide-react';
+import { parseExcelOrCsvFile, exportToExcel, exportToCsv } from '@/lib/excelUtils';
 
 export default function LeadsView() {
   const { 
     leads, 
-    settings, 
-    saveLead,
-    importLeadsBatch,
+    saveLead, 
     removeLead, 
-    convertToClient,
+    importLeadsBatch,
+    setEditingLead, 
     setIsLeadModalOpen, 
-    setEditingLead,
-    searchTerm,
-    setSearchTerm
+    settings, 
+    searchTerm, 
+    setSearchTerm,
+    convertToClient
   } = useApp();
 
-  const [selectedPotential, setSelectedPotential] = useState('All');
-  const [selectedService, setSelectedService] = useState('All');
+  const [selectedPriority, setSelectedPriority] = useState('All');
+  const [selectedOnboardStatus, setSelectedOnboardStatus] = useState('All');
   const [selectedProposal, setSelectedProposal] = useState('All');
+  const [selectedCallStatus, setSelectedCallStatus] = useState('All');
+
+  // Modals & previews
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [importPreview, setImportPreview] = useState([]);
-  const [rawText, setRawText] = useState('');
+  const [activeLeadForNotes, setActiveLeadForNotes] = useState(null);
+  const [newNoteText, setNewNoteText] = useState('');
+  const [isSavingBatch, setIsSavingBatch] = useState(false);
+  const [copiedId, setCopiedId] = useState(null);
 
   const todayStr = new Date().toISOString().split('T')[0];
 
   // Quick WhatsApp Launcher
-  const handleOpenWhatsApp = (phone, name, services) => {
-    const cleanPhone = phone.replace(/[^0-9]/g, '');
-    const serviceName = Array.isArray(services) && services.length > 0 ? services[0] : 'our digital marketing services';
+  const handleOpenWhatsApp = (phone, name, requirement) => {
+    const cleanPhone = String(phone).replace(/[^0-9]/g, '');
+    const serviceName = requirement || 'website development and digital marketing';
     const template = settings.whatsappTemplates?.[0]?.message || 'Hello {name}! Following up regarding {service}.';
     const text = template
       .replace('{name}', name || 'Client')
       .replace('{service}', serviceName);
 
-    window.open(`https://wa.me/${cleanPhone}?text=${encodeURIComponent(text)}`, '_blank');
+    if (cleanPhone) {
+      window.open(`https://wa.me/${cleanPhone}?text=${encodeURIComponent(text)}`, '_blank');
+    } else {
+      alert('No numeric phone number found for WhatsApp direct launcher.');
+    }
+  };
+
+  const handleCopy = (text, id) => {
+    navigator.clipboard.writeText(text);
+    setCopiedId(id);
+    setTimeout(() => setCopiedId(null), 2000);
   };
 
   // Filtered Leads
@@ -68,19 +88,21 @@ export default function LeadsView() {
         const q = searchTerm.toLowerCase();
         const matches = 
           lead.name?.toLowerCase().includes(q) ||
-          lead.phone?.includes(q) ||
+          lead.phone?.toLowerCase().includes(q) ||
           lead.requirements?.toLowerCase().includes(q) ||
-          (lead.services || []).some(s => s.toLowerCase().includes(q));
+          lead.latestFeedback?.toLowerCase().includes(q) ||
+          lead.platform?.toLowerCase().includes(q) ||
+          lead.firstFollowUp?.toLowerCase().includes(q);
         if (!matches) return false;
       }
 
-      // Potentiality
-      if (selectedPotential !== 'All' && lead.potentialityStatus !== selectedPotential) {
+      // Priority
+      if (selectedPriority !== 'All' && lead.priority !== selectedPriority) {
         return false;
       }
 
-      // Service
-      if (selectedService !== 'All' && !(lead.services || []).includes(selectedService)) {
+      // Onboard status
+      if (selectedOnboardStatus !== 'All' && lead.onboardStatus !== selectedOnboardStatus) {
         return false;
       }
 
@@ -89,9 +111,13 @@ export default function LeadsView() {
         return false;
       }
 
+      // Call status
+      if (selectedCallStatus === 'Received' && lead.callNotReceived) return false;
+      if (selectedCallStatus === 'NotReceived' && !lead.callNotReceived) return false;
+
       return true;
     });
-  }, [leads, searchTerm, selectedPotential, selectedService, selectedProposal]);
+  }, [leads, searchTerm, selectedPriority, selectedOnboardStatus, selectedProposal, selectedCallStatus]);
 
   // Quick In-Line Cell Update
   const handleQuickUpdate = async (id, field, value) => {
@@ -100,38 +126,46 @@ export default function LeadsView() {
 
   // Export handlers
   const handleExportExcel = () => {
-    const exportData = filteredLeads.map((l, index) => ({
-      'SL': index + 1,
+    const exportData = filteredLeads.map((l) => ({
       'Date': l.createdAt ? l.createdAt.split('T')[0] : todayStr,
-      'Client Name': l.name || '',
-      'WhatsApp Phone': l.phone || '',
-      'Email': l.email || '',
-      'Requirements': l.requirements || '',
-      'Services': (l.services || []).join(', '),
-      'Potentiality Status': l.potentialityStatus || 'Warm',
+      'Not receive call': l.callNotReceived ? 'TRUE' : 'FALSE',
+      'WhatsApp Number': l.phone || '',
+      'Requirement': l.requirements || '',
+      'Priority': l.priority || 'Medium ⚡',
       'Proposal Status': l.proposalSentStatus || 'Not Sent',
-      'Follow-up Date': l.followUpDate || '',
-      'Follow-up Time': l.followUpTime || '11:00 AM',
-      'Notes Count': (l.followUpNotes || []).length,
-      'Budget (BDT)': l.estimatedBudget || 0
+      'Onboard Status': l.onboardStatus || 'New Lead',
+      '1st Follow-Up': l.firstFollowUp || '',
+      '2nd Follow-Up': l.secondFollowUp || '',
+      '3rd Follow-Up': l.thirdFollowUp || '',
+      'Latest Feedback': l.latestFeedback || '',
+      'Next Action': l.nextAction || 'Follow Up',
+      'Deal Value (৳)': l.dealValue || 0,
+      'Platform': l.platform || '',
+      'Campaign Name': l.campaignName || '',
+      'Ad Creative / Type': l.adCreative || ''
     }));
 
-    exportToExcel(exportData, `WhatsApp_Leads_${todayStr}.xlsx`, 'Leads');
+    exportToExcel(exportData, `WhatsApp_Leads_${todayStr}.xlsx`, 'November');
   };
 
   const handleExportCsvFile = () => {
-    const exportData = filteredLeads.map((l, index) => ({
-      'SL': index + 1,
+    const exportData = filteredLeads.map((l) => ({
       'Date': l.createdAt ? l.createdAt.split('T')[0] : todayStr,
-      'Client Name': l.name || '',
-      'WhatsApp Phone': l.phone || '',
-      'Email': l.email || '',
-      'Requirements': l.requirements || '',
-      'Services': (l.services || []).join(', '),
-      'Potentiality Status': l.potentialityStatus || 'Warm',
+      'Not receive call': l.callNotReceived ? 'TRUE' : 'FALSE',
+      'WhatsApp Number': l.phone || '',
+      'Requirement': l.requirements || '',
+      'Priority': l.priority || 'Medium ⚡',
       'Proposal Status': l.proposalSentStatus || 'Not Sent',
-      'Follow-up Date': l.followUpDate || '',
-      'Follow-up Time': l.followUpTime || '11:00 AM'
+      'Onboard Status': l.onboardStatus || 'New Lead',
+      '1st Follow-Up': l.firstFollowUp || '',
+      '2nd Follow-Up': l.secondFollowUp || '',
+      '3rd Follow-Up': l.thirdFollowUp || '',
+      'Latest Feedback': l.latestFeedback || '',
+      'Next Action': l.nextAction || 'Follow Up',
+      'Deal Value (৳)': l.dealValue || 0,
+      'Platform': l.platform || '',
+      'Campaign Name': l.campaignName || '',
+      'Ad Creative / Type': l.adCreative || ''
     }));
 
     exportToCsv(exportData, `WhatsApp_Leads_${todayStr}.csv`);
@@ -143,58 +177,57 @@ export default function LeadsView() {
     if (!file) return;
 
     try {
-      const rows = await parseExcelOrCsvFile(file);
-      processImportRows(rows);
+      const parsedLeads = await parseExcelOrCsvFile(file, 'whatsapp');
+      if (!parsedLeads || parsedLeads.length === 0) {
+        alert('No valid WhatsApp leads found in the file. Please check file format.');
+        return;
+      }
+      setImportPreview(parsedLeads);
     } catch (err) {
       alert('Error parsing file: ' + err.message);
     }
   };
 
-  const processImportRows = (rows) => {
-    if (!rows || rows.length === 0) return;
-
-    const formatted = rows.map((r, idx) => {
-      // Find key matching name, phone, service, reqs, etc.
-      const keys = Object.keys(r);
-      const nameKey = keys.find(k => /name|client/i.test(k));
-      const phoneKey = keys.find(k => /phone|whatsapp|mobile|contact/i.test(k));
-      const reqKey = keys.find(k => /req|detail|note|inquir/i.test(k));
-      const srvKey = keys.find(k => /service|category/i.test(k));
-      const dateKey = keys.find(k => /date|created/i.test(k));
-      const potKey = keys.find(k => /poten|status/i.test(k));
-
-      const name = nameKey ? String(r[nameKey]).trim() : `Lead #${idx + 1}`;
-      const phone = phoneKey ? String(r[phoneKey]).trim() : '';
-      const requirements = reqKey ? String(r[reqKey]).trim() : '';
-      const servicesStr = srvKey ? String(r[srvKey]).trim() : 'Website Development';
-      const services = servicesStr.includes(',') ? servicesStr.split(',').map(s => s.trim()) : [servicesStr];
-      const potentialityStatus = potKey && ['Hot', 'Warm', 'Cold', 'Converted', 'Lost'].includes(r[potKey]) 
-        ? r[potKey] 
-        : 'Warm';
-
-      return {
-        name,
-        phone,
-        requirements,
-        services: services.filter(Boolean),
-        potentialityStatus,
-        proposalSentStatus: 'Not Sent',
-        followUpDate: todayStr,
-        followUpTime: '11:00 AM',
-        createdAt: dateKey && r[dateKey] ? String(r[dateKey]) : new Date().toISOString(),
-        followUpNotes: []
-      };
-    });
-
-    setImportPreview(formatted.filter(item => item.name && item.phone));
-  };
-
   const handleSaveImportedBatch = async () => {
     if (importPreview.length === 0) return;
-    await importLeadsBatch(importPreview);
-    setIsImportModalOpen(false);
-    setImportPreview([]);
-    setRawText('');
+    setIsSavingBatch(true);
+    try {
+      await importLeadsBatch(importPreview);
+      setIsImportModalOpen(false);
+      setImportPreview([]);
+    } catch (err) {
+      alert('Error saving batch: ' + err.message);
+    } finally {
+      setIsSavingBatch(false);
+    }
+  };
+
+  // Add note to active lead
+  const handleAddNote = async () => {
+    if (!newNoteText.trim() || !activeLeadForNotes) return;
+    const existing = activeLeadForNotes.followUpNotes || [];
+    const updatedNotes = [
+      ...existing,
+      {
+        _id: 'fn_' + Date.now(),
+        date: new Date().toISOString(),
+        note: newNoteText.trim(),
+        outcome: 'Connected'
+      }
+    ];
+
+    await saveLead({
+      _id: activeLeadForNotes._id,
+      followUpNotes: updatedNotes,
+      latestFeedback: newNoteText.trim()
+    });
+
+    setActiveLeadForNotes({
+      ...activeLeadForNotes,
+      followUpNotes: updatedNotes,
+      latestFeedback: newNoteText.trim()
+    });
+    setNewNoteText('');
   };
 
   return (
@@ -214,7 +247,7 @@ export default function LeadsView() {
             </span>
           </h2>
           <p className="text-xs text-slate-500 dark:text-slate-400">
-            Interactive spreadsheet view for all inbound WhatsApp leads. Import & Export as Excel (.xlsx) or CSV.
+            Interactive spreadsheet view for all inbound WhatsApp leads. Import & Export matching your master workbook format.
           </p>
         </div>
 
@@ -258,85 +291,85 @@ export default function LeadsView() {
             className="flex items-center gap-1.5 px-4 py-2 text-xs font-bold rounded-xl text-white bg-emerald-600 hover:bg-emerald-500 shadow-md shadow-emerald-600/20 active:scale-95 transition-all"
           >
             <Plus className="w-4 h-4" />
-            <span>Add Inbound Lead</span>
+            <span>Add WhatsApp Lead</span>
           </button>
         </div>
       </div>
 
-      {/* Filter Toolbar */}
+      {/* Filter and Search Bar */}
       <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm space-y-3">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
           
-          {/* Search */}
-          <div>
-            <label className="block text-[11px] font-bold uppercase text-slate-400 mb-1">
-              Search Lead
-            </label>
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
-              <input
-                type="text"
-                placeholder="Name, phone, service..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-8 pr-3 py-1.5 text-xs font-medium rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white"
-              />
-            </div>
+          {/* Keyword Search */}
+          <div className="relative">
+            <Search className="w-4 h-4 absolute left-3 top-2.5 text-slate-400" />
+            <input
+              type="text"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              placeholder="Search phone, handle, feedback..."
+              className="w-full pl-9 pr-3 py-1.5 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+            />
           </div>
 
-          {/* Potentiality Status Filter */}
+          {/* Priority Filter */}
           <div>
-            <label className="block text-[11px] font-bold uppercase text-slate-400 mb-1">
-              Potentiality
-            </label>
             <select
-              value={selectedPotential}
-              onChange={(e) => setSelectedPotential(e.target.value)}
+              value={selectedPriority}
+              onChange={(e) => setSelectedPriority(e.target.value)}
               className="w-full px-3 py-1.5 text-xs font-medium rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white"
             >
-              <option value="All">All Potentialities</option>
-              <option value="Hot">🔥 Hot Deal</option>
-              <option value="Warm">☀️ Warm</option>
-              <option value="Cold">❄️ Cold</option>
-              <option value="Converted">🏆 Converted</option>
-              <option value="Lost">❌ Lost</option>
+              <option value="All">All Priorities</option>
+              <option value="High 🔥">🔥 High Priority</option>
+              <option value="Medium ⚡">⚡ Medium Priority</option>
+              <option value="Low 💤">💤 Low Priority</option>
             </select>
           </div>
 
-          {/* Service Filter */}
+          {/* Onboard Status Filter */}
           <div>
-            <label className="block text-[11px] font-bold uppercase text-slate-400 mb-1">
-              Service Requested
-            </label>
             <select
-              value={selectedService}
-              onChange={(e) => setSelectedService(e.target.value)}
+              value={selectedOnboardStatus}
+              onChange={(e) => setSelectedOnboardStatus(e.target.value)}
               className="w-full px-3 py-1.5 text-xs font-medium rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white"
             >
-              <option value="All">All Services</option>
-              {(settings.services || []).map((srv) => (
-                <option key={srv} value={srv}>{srv}</option>
-              ))}
+              <option value="All">All Onboard Status</option>
+              <option value="New Lead">New Lead</option>
+              <option value="In Contact">In Contact</option>
+              <option value="Proposal Sent">Proposal Sent</option>
+              <option value="Onboarded / Won 🎉">Won / Onboarded 🎉</option>
+              <option value="Lost ❌">Lost ❌</option>
+              <option value="On Hold">On Hold</option>
             </select>
           </div>
 
           {/* Proposal Status */}
           <div>
-            <label className="block text-[11px] font-bold uppercase text-slate-400 mb-1">
-              Proposal Status
-            </label>
             <select
               value={selectedProposal}
               onChange={(e) => setSelectedProposal(e.target.value)}
               className="w-full px-3 py-1.5 text-xs font-medium rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white"
             >
-              <option value="All">All Proposals</option>
+              <option value="All">All Proposal Status</option>
               <option value="Not Sent">Not Sent</option>
-              <option value="Drafted">Drafted</option>
-              <option value="Sent">Sent</option>
+              <option value="Proposal Sent">Proposal Sent</option>
+              <option value="Requirement Gathering">Requirement Gathering</option>
               <option value="Under Review">Under Review</option>
               <option value="Accepted">Accepted</option>
               <option value="Rejected">Rejected</option>
+            </select>
+          </div>
+
+          {/* Call Received Filter */}
+          <div>
+            <select
+              value={selectedCallStatus}
+              onChange={(e) => setSelectedCallStatus(e.target.value)}
+              className="w-full px-3 py-1.5 text-xs font-medium rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white"
+            >
+              <option value="All">All Calls</option>
+              <option value="Received">📞 Call Received</option>
+              <option value="NotReceived">❌ Call Not Received</option>
             </select>
           </div>
 
@@ -345,218 +378,231 @@ export default function LeadsView() {
 
       {/* Excel-like Arranged Table View */}
       <div className="rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
-        <div className="overflow-x-auto max-h-[650px]">
+        <div className="overflow-x-auto max-h-[700px]">
           <table className="w-full text-left border-collapse">
-            <thead className="sticky top-0 z-10 bg-slate-100/90 dark:bg-slate-800/90 backdrop-blur-md text-[11px] font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400 border-b border-slate-200 dark:border-slate-700">
+            <thead className="sticky top-0 z-10 bg-slate-100/95 dark:bg-slate-800/95 backdrop-blur-md text-[11px] font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400 border-b border-slate-200 dark:border-slate-700">
               <tr>
-                <th className="py-3 px-3.5 w-10 text-center">SL</th>
-                <th className="py-3 px-4 min-w-[120px]">Date</th>
-                <th className="py-3 px-4 min-w-[160px]">Client Name</th>
-                <th className="py-3 px-4 min-w-[150px]">WhatsApp Phone</th>
-                <th className="py-3 px-4 min-w-[200px]">Requirements</th>
-                <th className="py-3 px-4 min-w-[160px]">Services</th>
-                <th className="py-3 px-4 min-w-[140px]">Potentiality</th>
-                <th className="py-3 px-4 min-w-[140px]">Proposal Status</th>
-                <th className="py-3 px-4 min-w-[150px]">Follow-up Notice</th>
-                <th className="py-3 px-4 min-w-[110px]">Notes</th>
-                <th className="py-3 px-4 text-right min-w-[160px]">Actions</th>
+                <th className="py-3 px-3 w-10 text-center">SL</th>
+                <th className="py-3 px-3.5 min-w-[105px]">Date</th>
+                <th className="py-3 px-3.5 min-w-[130px]">Call Status</th>
+                <th className="py-3 px-4 min-w-[170px]">WhatsApp / Handle</th>
+                <th className="py-3 px-4 min-w-[160px]">Requirement</th>
+                <th className="py-3 px-3.5 min-w-[125px]">Priority</th>
+                <th className="py-3 px-3.5 min-w-[130px]">Proposal Status</th>
+                <th className="py-3 px-3.5 min-w-[145px]">Onboard Status</th>
+                <th className="py-3 px-4 min-w-[180px]">1st Follow-Up</th>
+                <th className="py-3 px-4 min-w-[180px]">Latest Feedback</th>
+                <th className="py-3 px-3.5 min-w-[125px]">Next Action</th>
+                <th className="py-3 px-3.5 min-w-[110px]">Deal Value</th>
+                <th className="py-3 px-3.5 min-w-[120px]">Platform</th>
+                <th className="py-3 px-4 text-right min-w-[140px]">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 text-xs">
               {filteredLeads.length === 0 ? (
                 <tr>
-                  <td colSpan={11} className="py-16 text-center text-slate-400">
+                  <td colSpan={14} className="py-16 text-center text-slate-400">
                     <div className="max-w-sm mx-auto space-y-2">
                       <FileSpreadsheet className="w-10 h-10 mx-auto opacity-50 text-emerald-500" />
                       <h4 className="font-bold text-slate-700 dark:text-slate-300">No WhatsApp Leads Found</h4>
                       <p className="text-xs text-slate-500">
-                        Your WhatsApp lead sheet is currently fresh and clean. Click &quot;Add Inbound Lead&quot; or import an Excel/CSV file to start tracking.
+                        No leads match current filter. Click &quot;Import Excel / CSV&quot; to import your workbook.
                       </p>
                     </div>
                   </td>
                 </tr>
               ) : (
                 filteredLeads.map((lead, index) => {
-                  const isOverdue = lead.followUpDate && lead.followUpDate < todayStr;
-                  const isDueToday = lead.followUpDate && lead.followUpDate === todayStr;
-                  const noteCount = (lead.followUpNotes || []).length;
-                  const leadDate = lead.createdAt ? lead.createdAt.split('T')[0] : todayStr;
+                  const leadDate = lead.createdAt ? lead.createdAt.split('T')[0] : (lead.date || todayStr);
+                  const isCallFailed = lead.callNotReceived;
 
                   return (
                     <tr 
-                      key={lead._id}
+                      key={lead._id || index}
                       className="hover:bg-slate-50/90 dark:hover:bg-slate-800/50 transition-colors"
                     >
                       {/* SL */}
-                      <td className="py-3 px-3.5 text-center text-slate-400 font-mono text-[11px]">
+                      <td className="py-3 px-3 text-center text-slate-400 font-mono text-[11px]">
                         {index + 1}
                       </td>
 
                       {/* Date */}
-                      <td className="py-3 px-4 font-mono text-[11px] text-slate-600 dark:text-slate-400">
+                      <td className="py-3 px-3.5 font-mono text-[11px] text-slate-600 dark:text-slate-400 whitespace-nowrap">
                         {leadDate}
                       </td>
 
-                      {/* Name */}
-                      <td className="py-3 px-4">
-                        <div className="font-bold text-slate-900 dark:text-white">
-                          {lead.name}
-                        </div>
-                        {lead.email && (
-                          <div className="text-[10px] text-slate-400 truncate max-w-[140px]">
-                            {lead.email}
-                          </div>
-                        )}
-                      </td>
-
-                      {/* Phone with 1-click WhatsApp */}
-                      <td className="py-3 px-4 font-mono">
+                      {/* Call Status Badge (Toggleable) */}
+                      <td className="py-3 px-3.5">
                         <button
-                          onClick={() => handleOpenWhatsApp(lead.phone, lead.name, lead.services)}
-                          className="inline-flex items-center gap-1.5 px-2 py-1 rounded-lg text-xs font-semibold bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 hover:bg-emerald-100 transition-colors"
-                          title="Click to chat on WhatsApp"
+                          onClick={() => handleQuickUpdate(lead._id, 'callNotReceived', !lead.callNotReceived)}
+                          className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold border transition-all ${
+                            isCallFailed
+                              ? 'bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950/60 dark:text-rose-300 dark:border-rose-900/60'
+                              : 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/60 dark:text-emerald-300 dark:border-emerald-900/60'
+                          }`}
+                          title="Click to toggle call status"
                         >
-                          <Phone className="w-3 h-3 text-emerald-500" />
-                          <span>{lead.phone}</span>
+                          {isCallFailed ? (
+                            <>
+                              <PhoneOff className="w-2.5 h-2.5" />
+                              <span>Not Received</span>
+                            </>
+                          ) : (
+                            <>
+                              <PhoneCall className="w-2.5 h-2.5" />
+                              <span>Received</span>
+                            </>
+                          )}
                         </button>
                       </td>
 
-                      {/* Requirements */}
-                      <td className="py-3 px-4">
-                        <p className="text-xs text-slate-700 dark:text-slate-300 line-clamp-2 max-w-xs">
-                          {lead.requirements || 'No details specified.'}
-                        </p>
-                      </td>
-
-                      {/* Services */}
-                      <td className="py-3 px-4">
-                        <div className="flex flex-wrap gap-1 max-w-[180px]">
-                          {(lead.services || []).map((srv) => (
-                            <span
-                              key={srv}
-                              className="px-2 py-0.5 text-[10px] font-semibold rounded-md bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-200/80 dark:border-emerald-800"
-                            >
-                              {srv}
-                            </span>
-                          ))}
+                      {/* Phone / WhatsApp / Handle */}
+                      <td className="py-3 px-4 font-mono">
+                        <div className="flex items-center gap-1.5">
+                          <button
+                            onClick={() => handleOpenWhatsApp(lead.phone, lead.name, lead.requirements)}
+                            className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-semibold bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 hover:bg-emerald-100 transition-colors"
+                            title="Open WhatsApp chat"
+                          >
+                            <Phone className="w-3 h-3 text-emerald-500" />
+                            <span className="truncate max-w-[130px]">{lead.phone || lead.name}</span>
+                          </button>
+                          <button
+                            onClick={() => handleCopy(lead.phone || lead.name, lead._id)}
+                            className="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                            title="Copy number"
+                          >
+                            <Copy className="w-3 h-3" />
+                          </button>
                         </div>
                       </td>
 
-                      {/* Potentiality Status (In-cell Dropdown) */}
+                      {/* Requirement */}
                       <td className="py-3 px-4">
+                        <div className="text-xs text-slate-800 dark:text-slate-200 font-medium line-clamp-2 max-w-[180px]" title={lead.requirements}>
+                          {lead.requirements || 'Website Development'}
+                        </div>
+                      </td>
+
+                      {/* Priority */}
+                      <td className="py-3 px-3.5">
                         <select
-                          value={lead.potentialityStatus}
-                          onChange={(e) => handleQuickUpdate(lead._id, 'potentialityStatus', e.target.value)}
-                          className={`px-2 py-1 text-xs font-bold rounded-xl border focus:outline-none cursor-pointer ${
-                            lead.potentialityStatus === 'Hot'
-                              ? 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300 border-amber-300'
-                              : lead.potentialityStatus === 'Warm'
-                                ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 border-emerald-300'
-                                : lead.potentialityStatus === 'Converted'
-                                  ? 'bg-purple-100 text-purple-800 dark:bg-purple-950 dark:text-purple-300 border-purple-300'
-                                  : 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 border-slate-300'
-                          }`}
+                          value={lead.priority || 'Medium ⚡'}
+                          onChange={(e) => handleQuickUpdate(lead._id, 'priority', e.target.value)}
+                          className="px-2 py-1 text-xs font-bold rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 cursor-pointer"
                         >
-                          <option value="Hot">🔥 Hot</option>
-                          <option value="Warm">☀️ Warm</option>
-                          <option value="Cold">❄️ Cold</option>
-                          <option value="Converted">🏆 Converted</option>
-                          <option value="Lost">❌ Lost</option>
+                          <option value="High 🔥">🔥 High</option>
+                          <option value="Medium ⚡">⚡ Medium</option>
+                          <option value="Low 💤">💤 Low</option>
                         </select>
                       </td>
 
-                      {/* Proposal Status (In-cell Dropdown) */}
-                      <td className="py-3 px-4">
+                      {/* Proposal Status */}
+                      <td className="py-3 px-3.5">
                         <select
-                          value={lead.proposalSentStatus}
+                          value={lead.proposalSentStatus || 'Not Sent'}
                           onChange={(e) => handleQuickUpdate(lead._id, 'proposalSentStatus', e.target.value)}
-                          className="px-2 py-1 text-xs font-semibold rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-slate-700 focus:outline-none cursor-pointer"
+                          className="px-2 py-1 text-[11px] font-semibold rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 cursor-pointer"
                         >
                           <option value="Not Sent">Not Sent</option>
-                          <option value="Drafted">Drafted</option>
-                          <option value="Sent">Sent</option>
+                          <option value="Proposal Sent">Proposal Sent</option>
+                          <option value="Requirement Gathering">Requirement Gathering</option>
                           <option value="Under Review">Under Review</option>
                           <option value="Accepted">Accepted</option>
                           <option value="Rejected">Rejected</option>
                         </select>
                       </td>
 
-                      {/* Follow-up Notice Date */}
-                      <td className="py-3 px-4">
-                        <div className="flex items-center gap-1.5">
-                          <input
-                            type="date"
-                            value={lead.followUpDate || ''}
-                            onChange={(e) => handleQuickUpdate(lead._id, 'followUpDate', e.target.value)}
-                            className={`px-2 py-1 text-xs font-semibold rounded-lg border focus:outline-none ${
-                              isOverdue
-                                ? 'bg-red-50 text-red-700 border-red-300 dark:bg-red-950 dark:text-red-300 animate-pulse'
-                                : isDueToday
-                                  ? 'bg-amber-50 text-amber-800 border-amber-300 dark:bg-amber-950 dark:text-amber-300'
-                                  : 'bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-slate-200 border-slate-200 dark:border-slate-700'
-                            }`}
-                          />
-                        </div>
+                      {/* Onboard Status */}
+                      <td className="py-3 px-3.5">
+                        <select
+                          value={lead.onboardStatus || 'New Lead'}
+                          onChange={(e) => handleQuickUpdate(lead._id, 'onboardStatus', e.target.value)}
+                          className={`px-2 py-1 text-[11px] font-bold rounded-xl border cursor-pointer ${
+                            lead.onboardStatus?.includes('Won') || lead.onboardStatus?.includes('Onboarded')
+                              ? 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950 dark:text-emerald-300'
+                              : lead.onboardStatus?.includes('Lost')
+                              ? 'bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950 dark:text-rose-300'
+                              : 'bg-slate-50 text-slate-700 border-slate-200 dark:bg-slate-800 dark:text-slate-300'
+                          }`}
+                        >
+                          <option value="New Lead">New Lead</option>
+                          <option value="In Contact">In Contact</option>
+                          <option value="Proposal Sent">Proposal Sent</option>
+                          <option value="Onboarded / Won 🎉">Won 🎉</option>
+                          <option value="Lost ❌">Lost ❌</option>
+                          <option value="On Hold">On Hold</option>
+                        </select>
                       </td>
 
-                      {/* Follow-up Notes Count */}
+                      {/* 1st Follow-Up */}
                       <td className="py-3 px-4">
-                        <button
-                          onClick={() => {
-                            setEditingLead(lead);
-                            setIsLeadModalOpen(true);
-                          }}
-                          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 transition-colors"
-                        >
-                          <FileText className="w-3.5 h-3.5 text-emerald-500" />
-                          <span>{noteCount} {noteCount === 1 ? 'Note' : 'Notes'}</span>
-                        </button>
+                        <span className="text-[11px] text-slate-600 dark:text-slate-400 line-clamp-2 max-w-[180px]" title={lead.firstFollowUp}>
+                          {lead.firstFollowUp || '-'}
+                        </span>
+                      </td>
+
+                      {/* Latest Feedback */}
+                      <td className="py-3 px-4">
+                        <span className="text-[11px] font-medium text-slate-700 dark:text-slate-300 line-clamp-2 max-w-[180px]" title={lead.latestFeedback}>
+                          {lead.latestFeedback || '-'}
+                        </span>
+                      </td>
+
+                      {/* Next Action */}
+                      <td className="py-3 px-3.5">
+                        <span className="inline-block px-2 py-0.5 rounded-lg text-[10px] font-bold bg-amber-50 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300 border border-amber-200 dark:border-amber-900/60">
+                          {lead.nextAction || 'Follow Up'}
+                        </span>
+                      </td>
+
+                      {/* Deal Value */}
+                      <td className="py-3 px-3.5 font-bold font-mono text-slate-900 dark:text-white">
+                        {lead.dealValue ? `৳${lead.dealValue.toLocaleString()}` : '-'}
+                      </td>
+
+                      {/* Platform */}
+                      <td className="py-3 px-3.5 text-[11px] text-slate-500 dark:text-slate-400 truncate max-w-[110px]" title={lead.platform}>
+                        {lead.platform || 'Facebook'}
                       </td>
 
                       {/* Actions */}
                       <td className="py-3 px-4 text-right">
-                        <div className="flex items-center justify-end gap-1.5">
-                          {/* Direct WhatsApp Message */}
+                        <div className="flex items-center justify-end gap-1">
                           <button
-                            onClick={() => handleOpenWhatsApp(lead.phone, lead.name, lead.services)}
-                            className="p-1.5 rounded-lg text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950/60"
-                            title="WhatsApp Chat"
+                            onClick={() => setActiveLeadForNotes(lead)}
+                            className="p-1.5 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/50 rounded-lg transition-colors"
+                            title="View/Add Follow-up Notes"
                           >
-                            <Send className="w-4 h-4" />
+                            <MessageSquare className="w-3.5 h-3.5" />
                           </button>
-
-                          {/* Convert to Onboarded Client */}
                           <button
                             onClick={() => convertToClient(lead)}
-                            className="p-1.5 rounded-lg text-purple-600 hover:bg-purple-50 dark:hover:bg-purple-950/60"
-                            title="Onboard this Lead"
+                            className="p-1.5 text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950/50 rounded-lg transition-colors"
+                            title="Convert to Onboarded Client"
                           >
-                            <UserCheck className="w-4 h-4" />
+                            <UserCheck className="w-3.5 h-3.5" />
                           </button>
-
-                          {/* Edit Details */}
                           <button
                             onClick={() => {
                               setEditingLead(lead);
                               setIsLeadModalOpen(true);
                             }}
-                            className="p-1.5 rounded-lg text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800"
-                            title="Edit Lead"
+                            className="p-1.5 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors"
+                            title="Edit Lead Details"
                           >
-                            <Edit3 className="w-4 h-4" />
+                            <Edit3 className="w-3.5 h-3.5" />
                           </button>
-
-                          {/* Delete */}
                           <button
                             onClick={() => {
-                              if (confirm(`Delete lead "${lead.name}"?`)) {
+                              if (confirm(`Delete lead ${lead.phone || lead.name}?`)) {
                                 removeLead(lead._id);
                               }
                             }}
-                            className="p-1.5 rounded-lg text-red-500 hover:bg-red-50 dark:hover:bg-red-950/60"
+                            className="p-1.5 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/50 rounded-lg transition-colors"
                             title="Delete Lead"
                           >
-                            <Trash2 className="w-4 h-4" />
+                            <Trash2 className="w-3.5 h-3.5" />
                           </button>
                         </div>
                       </td>
@@ -570,69 +616,159 @@ export default function LeadsView() {
         </div>
       </div>
 
-      {/* ================= IMPORT EXCEL / CSV MODAL ================= */}
-      {isImportModalOpen && (
-        <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/70 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in">
-          <div className="relative w-full max-w-2xl rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xl p-6 space-y-4">
-            
-            <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
+      {/* Notes / History Drawer Modal */}
+      {activeLeadForNotes && (
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-slate-900 rounded-3xl max-w-lg w-full p-6 shadow-2xl border border-slate-200 dark:border-slate-800 space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
               <div>
-                <h3 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                  <Upload className="w-4 h-4 text-emerald-500" />
-                  Import WhatsApp Leads (Excel .xlsx / CSV)
-                </h3>
-                <p className="text-xs text-slate-500 dark:text-slate-400">
-                  Select your Excel spreadsheet (.xlsx, .xls) or CSV file. It will automatically arrange into columns and save to your database.
-                </p>
+                <h3 className="font-bold text-slate-900 dark:text-white">Follow-Up History & Notes</h3>
+                <p className="text-xs text-slate-500 font-mono">{activeLeadForNotes.phone || activeLeadForNotes.name}</p>
               </div>
-              <button onClick={() => setIsImportModalOpen(false)} className="text-slate-400 hover:text-slate-600">
-                <X className="w-5 h-5" />
+              <button
+                onClick={() => setActiveLeadForNotes(null)}
+                className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 font-bold"
+              >
+                ✕
               </button>
             </div>
 
-            {/* Drop Zone */}
-            <div className="border-2 border-dashed border-slate-300 dark:border-slate-700 rounded-2xl p-6 text-center hover:border-emerald-500 transition-colors">
-              <FileUp className="w-8 h-8 text-emerald-500 mx-auto mb-2" />
-              <p className="text-xs font-bold text-slate-700 dark:text-slate-300">
-                Click to browse Excel (.xlsx, .xls) or CSV
-              </p>
-              <p className="text-[11px] text-slate-400 mb-3">
-                Columns auto-matched: Name, Phone, Service, Requirements, Date, Status
-              </p>
-              <input
-                type="file"
-                accept=".xlsx,.xls,.csv"
-                onChange={handleFileUpload}
-                className="text-xs text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-emerald-50 file:text-emerald-700 hover:file:bg-emerald-100"
-              />
+            {/* Note list */}
+            <div className="max-h-60 overflow-y-auto space-y-2 pr-1">
+              {(activeLeadForNotes.followUpNotes || []).length === 0 ? (
+                <p className="text-xs text-slate-400 italic py-4 text-center">No recorded notes yet.</p>
+              ) : (
+                (activeLeadForNotes.followUpNotes || []).map((n, idx) => (
+                  <div key={idx} className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 text-xs">
+                    <p className="text-slate-800 dark:text-slate-200">{n.note}</p>
+                    <span className="text-[10px] text-slate-400 mt-1 block">
+                      {n.date ? new Date(n.date).toLocaleString() : 'Recent'}
+                    </span>
+                  </div>
+                ))
+              )}
             </div>
 
-            {/* Preview Status */}
+            {/* Add note */}
+            <div className="space-y-2 pt-2 border-t border-slate-100 dark:border-slate-800">
+              <label className="text-xs font-bold text-slate-700 dark:text-slate-300">Add New Follow-Up Note</label>
+              <textarea
+                value={newNoteText}
+                onChange={(e) => setNewNoteText(e.target.value)}
+                placeholder="Enter client conversation summary, feedback, or promised dates..."
+                rows={3}
+                className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+              />
+              <div className="flex justify-end gap-2">
+                <button
+                  onClick={() => setActiveLeadForNotes(null)}
+                  className="px-4 py-2 text-xs font-semibold rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300"
+                >
+                  Close
+                </button>
+                <button
+                  onClick={handleAddNote}
+                  className="px-4 py-2 text-xs font-bold rounded-xl text-white bg-emerald-600 hover:bg-emerald-500 transition-colors"
+                >
+                  Save Note
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Excel / CSV Import Modal */}
+      {isImportModalOpen && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-slate-900 rounded-3xl max-w-2xl w-full p-6 shadow-2xl border border-slate-200 dark:border-slate-800 space-y-4">
+            
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
+              <div>
+                <h3 className="font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                  <Upload className="w-4 h-4 text-blue-500" />
+                  <span>Import WhatsApp Master Excel / CSV</span>
+                </h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  Upload your WhatsApp lead sheet (e.g. &quot;WhatsApp_IT_Lead_Tracker.xlsx&quot; or any CSV).
+                </p>
+              </div>
+              <button
+                onClick={() => {
+                  setIsImportModalOpen(false);
+                  setImportPreview([]);
+                }}
+                className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* File Upload Zone */}
+            <div className="border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-2xl p-6 text-center hover:border-blue-500 transition-colors bg-slate-50/50 dark:bg-slate-800/50">
+              <input
+                type="file"
+                accept=".xlsx, .xls, .csv"
+                onChange={handleFileUpload}
+                id="whatsapp-file-upload"
+                className="hidden"
+              />
+              <label htmlFor="whatsapp-file-upload" className="cursor-pointer space-y-2 block">
+                <FileSpreadsheet className="w-10 h-10 mx-auto text-blue-500" />
+                <div className="text-xs font-bold text-slate-800 dark:text-slate-200">
+                  Click to select Excel (.xlsx) or CSV file
+                </div>
+                <div className="text-[11px] text-slate-400">
+                  Supports multi-sheet workbooks (`November`, `3smediMarketing`, etc.)
+                </div>
+              </label>
+            </div>
+
+            {/* Preview Section */}
             {importPreview.length > 0 && (
-              <div className="p-3 rounded-2xl bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800 text-xs text-emerald-800 dark:text-emerald-300 flex items-center justify-between">
-                <span>
-                  ✓ <strong>{importPreview.length}</strong> valid leads parsed and ready to save!
-                </span>
-                <span className="text-[10px] bg-emerald-200 dark:bg-emerald-900 px-2 py-0.5 rounded-full font-bold">
-                  Ready
-                </span>
+              <div className="space-y-3">
+                <div className="flex items-center justify-between text-xs font-bold text-slate-700 dark:text-slate-300">
+                  <span>Detected {importPreview.length} Valid Leads Ready to Save</span>
+                  <span className="text-[11px] text-emerald-600 font-semibold">✓ Format Recognized</span>
+                </div>
+                <div className="max-h-48 overflow-y-auto border border-slate-200 dark:border-slate-700 rounded-xl divide-y divide-slate-100 dark:divide-slate-800 text-xs">
+                  {importPreview.slice(0, 10).map((l, i) => (
+                    <div key={i} className="p-2.5 flex items-center justify-between bg-white dark:bg-slate-900">
+                      <div>
+                        <div className="font-bold text-slate-800 dark:text-slate-200">{l.phone || l.name}</div>
+                        <div className="text-[11px] text-slate-500">{l.requirements} • {l.platform || 'WhatsApp'}</div>
+                      </div>
+                      <div className="text-right font-mono text-[11px] text-slate-500">
+                        {l.priority}
+                      </div>
+                    </div>
+                  ))}
+                  {importPreview.length > 10 && (
+                    <div className="p-2 text-center text-slate-400 text-[11px] bg-slate-50 dark:bg-slate-800">
+                      + {importPreview.length - 10} more leads will be imported
+                    </div>
+                  )}
+                </div>
               </div>
             )}
 
-            {/* Actions */}
-            <div className="flex items-center justify-end gap-3 pt-2">
+            {/* Action buttons */}
+            <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-100 dark:border-slate-800">
               <button
-                onClick={() => setIsImportModalOpen(false)}
+                onClick={() => {
+                  setIsImportModalOpen(false);
+                  setImportPreview([]);
+                }}
                 className="px-4 py-2 text-xs font-semibold rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300"
               >
                 Cancel
               </button>
               <button
                 onClick={handleSaveImportedBatch}
-                disabled={importPreview.length === 0}
-                className="px-5 py-2 text-xs font-bold rounded-xl text-white bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 transition-all shadow-md shadow-emerald-600/20"
+                disabled={importPreview.length === 0 || isSavingBatch}
+                className="px-5 py-2 text-xs font-bold rounded-xl text-white bg-blue-600 hover:bg-blue-500 disabled:opacity-50 transition-all"
               >
-                Save {importPreview.length} Leads to Table
+                {isSavingBatch ? 'Saving...' : `Import ${importPreview.length} Leads`}
               </button>
             </div>
 

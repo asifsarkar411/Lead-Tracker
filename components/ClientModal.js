@@ -100,8 +100,8 @@ export default function ClientModal() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!formData.clientName.trim() || !formData.phone.trim()) {
-      setErrorMessage('Client Name and Phone are required.');
+    if (!formData.clientName.trim() && !formData.businessName.trim()) {
+      setErrorMessage('Client Name or Business Name is required.');
       return;
     }
 

@@ -364,6 +364,60 @@ export function AppProvider({ children }) {
     }
   };
 
+  const importClientsBatch = async (items) => {
+    try {
+      const res = await fetch('/api/clients', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(items),
+      });
+      const result = await res.json();
+      if (result.success) {
+        await refreshAllData();
+        return { success: true, count: result.count };
+      }
+      return { success: false, error: result.error };
+    } catch (e) {
+      return { success: false, error: e.message };
+    }
+  };
+
+  const importDemoLinksBatch = async (items) => {
+    try {
+      const res = await fetch('/api/demo-links', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(items),
+      });
+      const result = await res.json();
+      if (result.success) {
+        await fetchDemoLinks();
+        return { success: true, count: result.count };
+      }
+      return { success: false, error: result.error };
+    } catch (e) {
+      return { success: false, error: e.message };
+    }
+  };
+
+  const importSuccessfulClientsBatch = async (items) => {
+    try {
+      const res = await fetch('/api/successful-clients', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(items),
+      });
+      const result = await res.json();
+      if (result.success) {
+        await fetchSuccessfulClients();
+        return { success: true, count: result.count };
+      }
+      return { success: false, error: result.error };
+    } catch (e) {
+      return { success: false, error: e.message };
+    }
+  };
+
   // Demo Links CRUD
   const saveDemoLink = async (demoData) => {
     const isEdit = !!demoData._id;
@@ -547,12 +601,15 @@ export function AppProvider({ children }) {
         removeOutreachLead,
         clients,
         saveClient,
+        importClientsBatch,
         removeClient,
         demoLinks,
         saveDemoLink,
+        importDemoLinksBatch,
         removeDemoLink,
         successfulClients,
         saveSuccessfulClient,
+        importSuccessfulClientsBatch,
         removeSuccessfulClient,
         stats,
         refreshAllData,

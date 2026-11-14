@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getClients, createClient } from '@/lib/store';
+import { getClients, createClient, importBatchClients } from '@/lib/store';
 
 export const dynamic = 'force-dynamic';
 
@@ -23,8 +23,21 @@ export async function GET(request) {
 export async function POST(request) {
   try {
     const body = await request.json();
-    if (!body.clientName || !body.phone) {
-      return NextResponse.json({ success: false, error: 'Client Name and Phone are required' }, { status: 400 });
+
+    if (Array.isArray(body)) {
+      if (body.length === 0) {
+        return NextResponse.json({ success: false, error: 'Empty batch provided' }, { status: 400 });
+      }
+      const created = await importBatchClients(body);
+      return NextResponse.json({ success: true, count: created.length, clients: created }, { status: 201 });
+    }
+
+    if (!body.clientName && !body.businessName) {
+      return NextResponse.json({ success: false, error: 'Client or Business Name is required' }, { status: 400 });
+    }
+
+    if (!body.clientName) {
+      body.clientName = body.businessName;
     }
 
     const client = await createClient(body);

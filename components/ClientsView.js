@@ -3,13 +3,12 @@
 import React, { useState, useMemo } from 'react';
 import { useApp } from '@/context/AppContext';
 import DateFilterBar from './DateFilterBar';
-import { exportToExcel, exportToCsv } from '@/lib/excelUtils';
+import { exportToExcel, exportToCsv, parseExcelOrCsvFile } from '@/lib/excelUtils';
 import { 
   Briefcase, 
   Plus, 
   Search, 
   Phone, 
-  DollarSign, 
   CheckCircle2, 
   Clock, 
   AlertCircle, 
@@ -19,6 +18,7 @@ import {
   Calendar,
   Layers,
   Download,
+  Upload,
   FileSpreadsheet,
   LayoutGrid
 } from 'lucide-react';
@@ -29,13 +29,19 @@ export default function ClientsView() {
     settings, 
     setIsClientModalOpen, 
     setEditingClient, 
-    removeClient 
+    removeClient,
+    importClientsBatch
   } = useApp();
 
   const [search, setSearch] = useState('');
   const [filterPayment, setFilterPayment] = useState('All');
   const [filterStatus, setFilterStatus] = useState('All');
   const [viewMode, setViewMode] = useState('table'); // 'table' | 'cards'
+
+  // Import modal
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+  const [importPreview, setImportPreview] = useState([]);
+  const [isSavingBatch, setIsSavingBatch] = useState(false);
 
   const currency = '৳';
   const todayStr = new Date().toISOString().split('T')[0];
@@ -49,7 +55,8 @@ export default function ClientsView() {
           c.clientName?.toLowerCase().includes(q) ||
           c.businessName?.toLowerCase().includes(q) ||
           c.phone?.includes(q) ||
-          c.email?.toLowerCase().includes(q);
+          c.email?.toLowerCase().includes(q) ||
+          c.notes?.toLowerCase().includes(q);
         if (!matches) return false;
       }
 
@@ -65,20 +72,24 @@ export default function ClientsView() {
     });
   }, [clients, search, filterPayment, filterStatus]);
 
-  // Aggregate stats
+  // Aggregate stats (strictly in BDT ৳)
   const totalAsking = filteredClients.reduce((sum, c) => sum + (Number(c.askingCost) || 0), 0);
   const totalWon = filteredClients.reduce((sum, c) => sum + (Number(c.wonCost) || 0), 0);
   const totalPaid = filteredClients.reduce((sum, c) => sum + (Number(c.paidAmount) || 0), 0);
   const totalOutstanding = Math.max(0, totalWon - totalPaid);
 
   const handleOpenWhatsApp = (phone, name, business) => {
-    const cleanPhone = phone.replace(/[^0-9]/g, '');
+    const cleanPhone = String(phone).replace(/[^0-9]/g, '');
     const template = 'Hi {name}! Checking in regarding project milestones for {business}. Let me know if you need any updates today.';
     const text = template
       .replace('{name}', name || 'Client')
       .replace('{business}', business || 'your business');
 
-    window.open(`https://wa.me/${cleanPhone}?text=${encodeURIComponent(text)}`, '_blank');
+    if (cleanPhone) {
+      window.open(`https://wa.me/${cleanPhone}?text=${encodeURIComponent(text)}`, '_blank');
+    } else {
+      alert('No numeric phone number found for WhatsApp direct launcher.');
+    }
   };
 
   const handleExportExcel = () => {
@@ -90,14 +101,15 @@ export default function ClientsView() {
       'Phone': c.phone || '',
       'Email': c.email || '',
       'Services': (c.services || []).join(', '),
-      'Asking Cost (BDT)': Number(c.askingCost) || 0,
-      'Won Cost (BDT)': Number(c.wonCost) || 0,
-      'Paid Amount (BDT)': Number(c.paidAmount) || 0,
-      'Due Balance (BDT)': Math.max(0, (Number(c.wonCost) || 0) - (Number(c.paidAmount) || 0)),
+      'Asking Cost (BDT ৳)': Number(c.askingCost) || 0,
+      'Won Cost (BDT ৳)': Number(c.wonCost) || 0,
+      'Paid Amount (BDT ৳)': Number(c.paidAmount) || 0,
+      'Due Balance (BDT ৳)': Math.max(0, (Number(c.wonCost) || 0) - (Number(c.paidAmount) || 0)),
       'Payment Status': c.paymentStatus || 'Pending',
       'Client Status': c.clientStatus || 'Active',
       'Contract': c.contractDuration || '',
-      'Delivery Date': c.deliveryDate || ''
+      'Delivery Date': c.deliveryDate || '',
+      'Notes': c.notes || ''
     }));
 
     exportToExcel(exportData, `Onboarded_Clients_${todayStr}.xlsx`, 'Clients');
@@ -112,15 +124,46 @@ export default function ClientsView() {
       'Phone': c.phone || '',
       'Email': c.email || '',
       'Services': (c.services || []).join(', '),
-      'Asking Cost (BDT)': Number(c.askingCost) || 0,
-      'Won Cost (BDT)': Number(c.wonCost) || 0,
-      'Paid Amount (BDT)': Number(c.paidAmount) || 0,
-      'Due Balance (BDT)': Math.max(0, (Number(c.wonCost) || 0) - (Number(c.paidAmount) || 0)),
+      'Asking Cost (BDT ৳)': Number(c.askingCost) || 0,
+      'Won Cost (BDT ৳)': Number(c.wonCost) || 0,
+      'Paid Amount (BDT ৳)': Number(c.paidAmount) || 0,
+      'Due Balance (BDT ৳)': Math.max(0, (Number(c.wonCost) || 0) - (Number(c.paidAmount) || 0)),
       'Payment Status': c.paymentStatus || 'Pending',
       'Client Status': c.clientStatus || 'Active'
     }));
 
     exportToCsv(exportData, `Onboarded_Clients_${todayStr}.csv`);
+  };
+
+  // Import handler
+  const handleFileUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      const parsed = await parseExcelOrCsvFile(file, 'onboard');
+      if (!parsed || parsed.length === 0) {
+        alert('No valid clients found in file.');
+        return;
+      }
+      setImportPreview(parsed);
+    } catch (err) {
+      alert('Error parsing file: ' + err.message);
+    }
+  };
+
+  const handleSaveImportedBatch = async () => {
+    if (importPreview.length === 0) return;
+    setIsSavingBatch(true);
+    try {
+      await importClientsBatch(importPreview);
+      setIsImportModalOpen(false);
+      setImportPreview([]);
+    } catch (err) {
+      alert('Error saving batch: ' + err.message);
+    } finally {
+      setIsSavingBatch(false);
+    }
   };
 
   const getPaymentBadge = (status) => {
@@ -217,13 +260,22 @@ export default function ClientsView() {
             <span>Export CSV</span>
           </button>
 
+          {/* Import Excel */}
+          <button
+            onClick={() => setIsImportModalOpen(true)}
+            className="flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold rounded-xl text-white bg-purple-600 hover:bg-purple-500 shadow-md shadow-purple-600/20 active:scale-95 transition-all"
+          >
+            <Upload className="w-3.5 h-3.5" />
+            <span>Import Excel</span>
+          </button>
+
           {/* New Client */}
           <button
             onClick={() => {
               setEditingClient(null);
               setIsClientModalOpen(true);
             }}
-            className="flex items-center gap-2 px-4 py-2 text-xs font-bold rounded-xl text-white bg-purple-600 hover:bg-purple-500 shadow-md shadow-purple-600/20 active:scale-95 transition-all"
+            className="flex items-center gap-2 px-4 py-2 text-xs font-bold rounded-xl text-white bg-emerald-600 hover:bg-emerald-500 shadow-md shadow-emerald-600/20 active:scale-95 transition-all"
           >
             <Plus className="w-4 h-4" />
             <span>New Client Onboard</span>
@@ -337,7 +389,7 @@ export default function ClientsView() {
                         <Briefcase className="w-10 h-10 mx-auto opacity-50 text-purple-500" />
                         <h4 className="font-bold text-slate-700 dark:text-slate-300">No Onboarded Clients</h4>
                         <p className="text-xs text-slate-500">
-                          Click &quot;New Client Onboard&quot; or convert an inbound WhatsApp lead into a client.
+                          Click &quot;New Client Onboard&quot; or &quot;Import Excel&quot; to load client accounts.
                         </p>
                       </div>
                     </td>
@@ -347,59 +399,75 @@ export default function ClientsView() {
                     const asking = Number(client.askingCost) || 0;
                     const won = Number(client.wonCost) || 0;
                     const paid = Number(client.paidAmount) || 0;
-                    const balance = Math.max(0, won - paid);
+                    const due = Math.max(0, won - paid);
 
                     return (
-                      <tr key={client._id} className="hover:bg-slate-50/90 dark:hover:bg-slate-800/50 transition-colors">
+                      <tr 
+                        key={client._id}
+                        className="hover:bg-slate-50/90 dark:hover:bg-slate-800/50 transition-colors"
+                      >
                         <td className="py-3 px-3.5 text-center text-slate-400 font-mono text-[11px]">
                           {index + 1}
                         </td>
 
                         <td className="py-3 px-4">
                           <div className="font-bold text-slate-900 dark:text-white">
-                            {client.businessName || client.clientName}
+                            {client.clientName}
                           </div>
-                          <div className="text-[11px] text-slate-500 dark:text-slate-400">
-                            {client.clientName} {client.email && `• ${client.email}`}
-                          </div>
+                          {client.businessName && client.businessName !== client.clientName && (
+                            <div className="text-[11px] text-slate-500">
+                              {client.businessName}
+                            </div>
+                          )}
+                          {client.email && (
+                            <div className="text-[10px] text-slate-400">
+                              {client.email}
+                            </div>
+                          )}
                         </td>
 
                         <td className="py-3 px-4 font-mono">
-                          <button
-                            onClick={() => handleOpenWhatsApp(client.phone, client.clientName, client.businessName)}
-                            className="inline-flex items-center gap-1.5 px-2 py-1 rounded-lg text-xs font-semibold bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 hover:bg-emerald-100 transition-colors"
-                          >
-                            <Phone className="w-3 h-3 text-emerald-500" />
-                            <span>{client.phone}</span>
-                          </button>
+                          {client.phone ? (
+                            <button
+                              onClick={() => handleOpenWhatsApp(client.phone, client.clientName, client.businessName)}
+                              className="inline-flex items-center gap-1.5 px-2 py-1 rounded-lg text-xs font-semibold bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 hover:bg-emerald-100 transition-colors"
+                              title="Chat on WhatsApp"
+                            >
+                              <Phone className="w-3 h-3 text-emerald-500" />
+                              <span>{client.phone}</span>
+                            </button>
+                          ) : (
+                            <span className="text-slate-400 italic">No phone</span>
+                          )}
                         </td>
 
                         <td className="py-3 px-4">
-                          <div className="flex flex-wrap gap-1 max-w-[160px]">
+                          <div className="flex flex-wrap gap-1 max-w-[170px]">
                             {(client.services || []).map((srv) => (
-                              <span key={srv} className="px-2 py-0.5 text-[10px] font-semibold rounded-md bg-purple-50 text-purple-700 dark:bg-purple-950/60 dark:text-purple-300 border border-purple-200/80 dark:border-purple-800">
+                              <span
+                                key={srv}
+                                className="px-2 py-0.5 text-[10px] font-semibold rounded-md bg-purple-50 text-purple-700 dark:bg-purple-950/60 dark:text-purple-300 border border-purple-200/80 dark:border-purple-800"
+                              >
                                 {srv}
                               </span>
                             ))}
                           </div>
                         </td>
 
-                        <td className="py-3 px-4 font-mono text-slate-400 line-through">
-                          {currency} {asking.toLocaleString()}
+                        <td className="py-3 px-4 font-mono text-slate-500">
+                          {asking > 0 ? `${currency} ${asking.toLocaleString()}` : '-'}
                         </td>
 
                         <td className="py-3 px-4 font-mono font-bold text-purple-600 dark:text-purple-400">
-                          {currency} {won.toLocaleString()}
+                          {won > 0 ? `${currency} ${won.toLocaleString()}` : '-'}
                         </td>
 
                         <td className="py-3 px-4 font-mono font-bold text-emerald-600 dark:text-emerald-400">
-                          {currency} {paid.toLocaleString()}
+                          {paid > 0 ? `${currency} ${paid.toLocaleString()}` : `${currency} 0`}
                         </td>
 
-                        <td className="py-3 px-4 font-mono font-bold">
-                          <span className={balance > 0 ? 'text-amber-500' : 'text-emerald-500'}>
-                            {currency} {balance.toLocaleString()}
-                          </span>
+                        <td className="py-3 px-4 font-mono font-bold text-amber-500">
+                          {due > 0 ? `${currency} ${due.toLocaleString()}` : <span className="text-emerald-500">Cleared ✓</span>}
                         </td>
 
                         <td className="py-3 px-4">
@@ -411,28 +479,27 @@ export default function ClientsView() {
                         </td>
 
                         <td className="py-3 px-4 text-right">
-                          <div className="flex items-center justify-end gap-1.5">
+                          <div className="flex items-center justify-end gap-1">
                             <button
                               onClick={() => {
                                 setEditingClient(client);
                                 setIsClientModalOpen(true);
                               }}
-                              className="p-1.5 rounded-lg text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800"
+                              className="p-1.5 text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors"
                               title="Edit Client"
                             >
-                              <Edit3 className="w-4 h-4" />
+                              <Edit3 className="w-3.5 h-3.5" />
                             </button>
-
                             <button
                               onClick={() => {
-                                if (confirm(`Delete client "${client.clientName}"?`)) {
+                                if (confirm(`Delete client record for "${client.clientName}"?`)) {
                                   removeClient(client._id);
                                 }
                               }}
-                              className="p-1.5 rounded-lg text-red-500 hover:bg-red-50 dark:hover:bg-red-950/60"
+                              className="p-1.5 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/50 rounded-lg transition-colors"
                               title="Delete Client"
                             >
-                              <Trash2 className="w-4 h-4" />
+                              <Trash2 className="w-3.5 h-3.5" />
                             </button>
                           </div>
                         </td>
@@ -445,85 +512,143 @@ export default function ClientsView() {
           </div>
         </div>
       ) : (
-        /* View Mode: Cards View */
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+        /* Cards View */
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {filteredClients.map((client) => {
-            const asking = Number(client.askingCost) || 0;
             const won = Number(client.wonCost) || 0;
             const paid = Number(client.paidAmount) || 0;
-            const balance = Math.max(0, won - paid);
+            const due = Math.max(0, won - paid);
 
             return (
               <div
                 key={client._id}
-                className="p-5 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:border-purple-500/40 shadow-sm hover:shadow-md transition-all flex flex-col justify-between space-y-4"
+                className="p-5 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm space-y-4 hover:shadow-md transition-shadow"
               >
-                <div className="space-y-1.5">
-                  <div className="flex items-start justify-between gap-2">
-                    <div>
-                      <h3 className="font-bold text-base text-slate-900 dark:text-white leading-tight">
-                        {client.businessName || client.clientName}
-                      </h3>
-                      <p className="text-xs text-slate-500">Contact: {client.clientName}</p>
-                    </div>
-                    {getProjectStatusBadge(client.clientStatus)}
+                <div className="flex items-start justify-between">
+                  <div>
+                    <h3 className="font-bold text-slate-900 dark:text-white text-sm">
+                      {client.clientName}
+                    </h3>
+                    <p className="text-xs text-slate-500">{client.businessName || 'Independent Deal'}</p>
                   </div>
-
-                  <button
-                    onClick={() => handleOpenWhatsApp(client.phone, client.clientName, client.businessName)}
-                    className="inline-flex items-center gap-1 text-xs font-mono font-medium text-emerald-600 dark:text-emerald-400 hover:underline"
-                  >
-                    <Phone className="w-3 h-3 text-emerald-500" />
-                    <span>{client.phone}</span>
-                  </button>
+                  {getProjectStatusBadge(client.clientStatus)}
                 </div>
 
-                <div className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/50 space-y-2 text-xs">
-                  <div className="flex justify-between">
-                    <span className="text-slate-500">Asking Cost:</span>
-                    <span className="line-through text-slate-400">{currency} {asking.toLocaleString()}</span>
+                <div className="grid grid-cols-3 gap-2 p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/60 font-mono text-center">
+                  <div>
+                    <span className="text-[10px] text-slate-400 block">Deal (৳)</span>
+                    <span className="text-xs font-bold text-slate-900 dark:text-white">{won.toLocaleString()}</span>
                   </div>
-                  <div className="flex justify-between font-bold text-sm">
-                    <span>Won Deal Price:</span>
-                    <span className="text-purple-600 dark:text-purple-400">{currency} {won.toLocaleString()}</span>
+                  <div>
+                    <span className="text-[10px] text-slate-400 block">Paid (৳)</span>
+                    <span className="text-xs font-bold text-emerald-600">{paid.toLocaleString()}</span>
                   </div>
-                  <div className="flex justify-between pt-1 border-t border-slate-200 dark:border-slate-700">
-                    <span>Cash Collected:</span>
-                    <span className="font-bold text-emerald-600">{currency} {paid.toLocaleString()}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>Due Balance:</span>
-                    <span className={`font-bold ${balance > 0 ? 'text-amber-500' : 'text-emerald-500'}`}>{currency} {balance.toLocaleString()}</span>
+                  <div>
+                    <span className="text-[10px] text-slate-400 block">Due (৳)</span>
+                    <span className="text-xs font-bold text-amber-500">{due.toLocaleString()}</span>
                   </div>
                 </div>
 
-                <div className="flex items-center justify-between pt-2 border-t border-slate-100 dark:border-slate-800">
-                  {getPaymentBadge(client.paymentStatus)}
-                  <div className="flex items-center gap-1.5">
+                <div className="flex items-center justify-between text-xs pt-2 border-t border-slate-100 dark:border-slate-800">
+                  {client.phone ? (
+                    <button
+                      onClick={() => handleOpenWhatsApp(client.phone, client.clientName, client.businessName)}
+                      className="inline-flex items-center gap-1.5 text-emerald-600 font-semibold"
+                    >
+                      <Phone className="w-3.5 h-3.5" />
+                      <span>{client.phone}</span>
+                    </button>
+                  ) : <span className="text-slate-400">No phone</span>}
+
+                  <div className="flex items-center gap-1">
                     <button
                       onClick={() => {
                         setEditingClient(client);
                         setIsClientModalOpen(true);
                       }}
-                      className="p-1.5 rounded-lg text-slate-500 hover:bg-slate-100"
+                      className="p-1.5 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
                     >
-                      <Edit3 className="w-4 h-4" />
+                      <Edit3 className="w-3.5 h-3.5" />
                     </button>
                     <button
-                      onClick={() => {
-                        if (confirm(`Delete client "${client.clientName}"?`)) {
-                          removeClient(client._id);
-                        }
-                      }}
-                      className="p-1.5 rounded-lg text-red-500 hover:bg-red-50"
+                      onClick={() => removeClient(client._id)}
+                      className="p-1.5 text-rose-400 hover:text-rose-600"
                     >
-                      <Trash2 className="w-4 h-4" />
+                      <Trash2 className="w-3.5 h-3.5" />
                     </button>
                   </div>
                 </div>
               </div>
             );
           })}
+        </div>
+      )}
+
+      {/* Import Modal */}
+      {isImportModalOpen && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-slate-900 rounded-3xl max-w-xl w-full p-6 shadow-2xl border border-slate-200 dark:border-slate-800 space-y-4">
+            
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
+              <h3 className="font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                <Upload className="w-4 h-4 text-purple-500" />
+                <span>Import Onboard Clients Sheet</span>
+              </h3>
+              <button onClick={() => setIsImportModalOpen(false)} className="text-slate-400 hover:text-slate-600">✕</button>
+            </div>
+
+            <div className="border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-2xl p-6 text-center hover:border-purple-500 transition-colors bg-slate-50/50 dark:bg-slate-800/50">
+              <input
+                type="file"
+                accept=".xlsx, .xls, .csv"
+                onChange={handleFileUpload}
+                id="onboard-file-upload"
+                className="hidden"
+              />
+              <label htmlFor="onboard-file-upload" className="cursor-pointer space-y-2 block">
+                <FileSpreadsheet className="w-10 h-10 mx-auto text-purple-500" />
+                <div className="text-xs font-bold text-slate-800 dark:text-slate-200">
+                  Select Excel file with &quot;Onboard&quot; sheet or CSV
+                </div>
+                <div className="text-[11px] text-slate-400">
+                  Supports columns like Name, amount own, Details, asking price, etc.
+                </div>
+              </label>
+            </div>
+
+            {importPreview.length > 0 && (
+              <div className="space-y-2">
+                <div className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                  Found {importPreview.length} clients to import:
+                </div>
+                <div className="max-h-40 overflow-y-auto border border-slate-200 dark:border-slate-700 rounded-xl divide-y divide-slate-100 dark:divide-slate-800 text-xs p-2">
+                  {importPreview.map((c, i) => (
+                    <div key={i} className="py-1.5 flex justify-between">
+                      <span className="font-bold">{c.clientName} ({c.businessName})</span>
+                      <span className="font-mono text-purple-600">৳{c.wonCost?.toLocaleString()}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <div className="flex justify-end gap-2 pt-3 border-t border-slate-100 dark:border-slate-800">
+              <button
+                onClick={() => setIsImportModalOpen(false)}
+                className="px-4 py-2 text-xs font-semibold rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSaveImportedBatch}
+                disabled={importPreview.length === 0 || isSavingBatch}
+                className="px-5 py-2 text-xs font-bold rounded-xl text-white bg-purple-600 hover:bg-purple-500 disabled:opacity-50"
+              >
+                {isSavingBatch ? 'Saving...' : `Import ${importPreview.length} Clients`}
+              </button>
+            </div>
+
+          </div>
         </div>
       )}
 

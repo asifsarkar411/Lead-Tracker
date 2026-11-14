@@ -33,8 +33,12 @@ export async function POST(request) {
       return NextResponse.json({ success: true, count: created.length, outreachLeads: created }, { status: 201 });
     }
 
+    if (!body.name && !body.business && !body.company && !body.phone) {
+      return NextResponse.json({ success: false, error: 'Business name or phone is required' }, { status: 400 });
+    }
+
     if (!body.name) {
-      return NextResponse.json({ success: false, error: 'Name is required' }, { status: 400 });
+      body.name = body.business || body.company || 'Outreach Lead';
     }
 
     const created = await createOutreachLead(body);
