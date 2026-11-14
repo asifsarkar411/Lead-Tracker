@@ -34,6 +34,8 @@ export default function OutreachView() {
     importOutreachBatch, 
     removeOutreachLead, 
     convertToClient,
+    setIsMeetingModalOpen,
+    setEditingMeeting,
     settings 
   } = useApp();
 
@@ -664,6 +666,22 @@ export default function OutreachView() {
                               </a>
                             )}
                             <button
+                              onClick={() => {
+                                setEditingMeeting({
+                                  title: `Discovery Call with ${item.business || item.name}`,
+                                  clientName: item.business || item.name,
+                                  phone: item.phone,
+                                  meetingDate: todayStr,
+                                  agenda: `Present audit findings for ${item.category || 'Business'} & propose website/SEO roadmap.`
+                                });
+                                setIsMeetingModalOpen(true);
+                              }}
+                              className="p-1.5 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/50 rounded-lg transition-colors"
+                              title="Schedule Meeting"
+                            >
+                              <Calendar className="w-3.5 h-3.5" />
+                            </button>
+                            <button
                               onClick={() => setActiveOutreachForNotes(item)}
                               className="p-1.5 text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 rounded-lg transition-colors"
                               title="Notes & Multi Follow-ups"
@@ -880,6 +898,22 @@ export default function OutreachView() {
                           <Globe className="w-3.5 h-3.5" />
                         </a>
                       )}
+                      <button
+                        onClick={() => {
+                          setEditingMeeting({
+                            title: `Discovery Call with ${item.business || item.name}`,
+                            clientName: item.business || item.name,
+                            phone: item.phone,
+                            meetingDate: todayStr,
+                            agenda: `Present audit findings for ${item.category || 'Business'} & propose website/SEO roadmap.`
+                          });
+                          setIsMeetingModalOpen(true);
+                        }}
+                        className="p-1.5 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/50 rounded-lg transition-colors"
+                        title="Schedule Meeting"
+                      >
+                        <Calendar className="w-3.5 h-3.5" />
+                      </button>
                       <button
                         onClick={() => setActiveOutreachForNotes(item)}
                         className="p-1.5 text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 rounded-lg transition-colors"

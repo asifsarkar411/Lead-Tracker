@@ -38,6 +38,8 @@ export default function LeadsView() {
     importLeadsBatch,
     setEditingLead, 
     setIsLeadModalOpen, 
+    setIsMeetingModalOpen,
+    setEditingMeeting,
     settings, 
     searchTerm, 
     setSearchTerm,
@@ -591,8 +593,24 @@ export default function LeadsView() {
                         <td className="py-3 px-4 text-right">
                           <div className="flex items-center justify-end gap-1">
                             <button
-                              onClick={() => setActiveLeadForNotes(lead)}
+                              onClick={() => {
+                                setEditingMeeting({
+                                  title: `Demo Call with ${lead.name || lead.phone}`,
+                                  clientName: lead.name || lead.phone,
+                                  phone: lead.phone,
+                                  meetingDate: todayStr,
+                                  agenda: `Discuss ${lead.requirements || 'Website Development'} & present demo links.`
+                                });
+                                setIsMeetingModalOpen(true);
+                              }}
                               className="p-1.5 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/50 rounded-lg transition-colors"
+                              title="Schedule Client Meeting / Call"
+                            >
+                              <Calendar className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              onClick={() => setActiveLeadForNotes(lead)}
+                              className="p-1.5 text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 rounded-lg transition-colors"
                               title="View/Add Follow-up Notes"
                             >
                               <MessageSquare className="w-3.5 h-3.5" />
@@ -759,8 +777,24 @@ export default function LeadsView() {
 
                     <div className="flex items-center gap-1">
                       <button
-                        onClick={() => setActiveLeadForNotes(lead)}
+                        onClick={() => {
+                          setEditingMeeting({
+                            title: `Demo Call with ${lead.name || lead.phone}`,
+                            clientName: lead.name || lead.phone,
+                            phone: lead.phone,
+                            meetingDate: todayStr,
+                            agenda: `Discuss ${lead.requirements || 'Website Development'} & present demo links.`
+                          });
+                          setIsMeetingModalOpen(true);
+                        }}
                         className="p-1.5 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/50 rounded-lg"
+                        title="Schedule Meeting"
+                      >
+                        <Calendar className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        onClick={() => setActiveLeadForNotes(lead)}
+                        className="p-1.5 text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 rounded-lg"
                         title="Notes"
                       >
                         <MessageSquare className="w-3.5 h-3.5" />

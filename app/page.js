@@ -9,9 +9,12 @@ import LeadsView from '@/components/LeadsView';
 import OutreachView from '@/components/OutreachView';
 import ClientsView from '@/components/ClientsView';
 import ClientListView from '@/components/ClientListView';
+import MeetingsView from '@/components/MeetingsView';
 import AdminSettingsView from '@/components/AdminSettingsView';
 import LeadModal from '@/components/LeadModal';
 import ClientModal from '@/components/ClientModal';
+import MeetingModal from '@/components/MeetingModal';
+import AuthModal from '@/components/AuthModal';
 import ReminderNoticeModal from '@/components/ReminderNoticeModal';
 import MobileBottomNav from '@/components/MobileBottomNav';
 
@@ -37,6 +40,7 @@ export default function Home() {
           {activeTab === 'dashboard' && <DashboardOverview />}
           {activeTab === 'leads' && <LeadsView />}
           {activeTab === 'outreach' && <OutreachView />}
+          {activeTab === 'meetings' && <MeetingsView />}
           {activeTab === 'clients' && <ClientsView />}
           {activeTab === 'client-list' && <ClientListView />}
           {activeTab === 'reminders' && (
@@ -62,6 +66,8 @@ export default function Home() {
       {/* Global Interactive Modals */}
       <LeadModal />
       <ClientModal />
+      <MeetingModal />
+      <AuthModal />
       <ReminderNoticeModal />
 
     </div>

@@ -19,10 +19,13 @@ export function AppProvider({ children }) {
   const [clients, setClients] = useState([]);
   const [demoLinks, setDemoLinks] = useState([]);
   const [successfulClients, setSuccessfulClients] = useState([]);
+  const [meetings, setMeetings] = useState([]);
+  const [users, setUsers] = useState([]);
+  const [currentUser, setCurrentUser] = useState(null);
   const [stats, setStats] = useState(null);
 
   // Active view tab
-  // 'dashboard' | 'leads' | 'outreach' | 'clients' | 'client-list' | 'admin'
+  // 'dashboard' | 'leads' | 'outreach' | 'clients' | 'client-list' | 'meetings' | 'admin'
   const [activeTab, setActiveTab] = useState('dashboard');
   const [clientListSubTab, setClientListSubTab] = useState('successful'); // 'successful' | 'demo-links'
   const [searchTerm, setSearchTerm] = useState('');
@@ -45,6 +48,10 @@ export function AppProvider({ children }) {
   const [isOutreachModalOpen, setIsOutreachModalOpen] = useState(false);
   const [editingOutreach, setEditingOutreach] = useState(null);
 
+  const [isMeetingModalOpen, setIsMeetingModalOpen] = useState(false);
+  const [editingMeeting, setEditingMeeting] = useState(null);
+
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [isReminderModalOpen, setIsReminderModalOpen] = useState(false);
   const [isDemoLinkModalOpen, setIsDemoLinkModalOpen] = useState(false);
   const [editingDemoLink, setEditingDemoLink] = useState(null);
@@ -95,6 +102,18 @@ export function AppProvider({ children }) {
         }
       } catch (e) {
         console.warn('Error reading cached settings:', e);
+      }
+    }
+
+    const cachedUser = localStorage.getItem('lead_tracker_auth_user');
+    if (cachedUser) {
+      try {
+        const parsedUser = JSON.parse(cachedUser);
+        if (parsedUser && parsedUser.username) {
+          setCurrentUser(parsedUser);
+        }
+      } catch (e) {
+        console.warn('Error reading cached user session:', e);
       }
     }
   }, []);
@@ -234,6 +253,30 @@ export function AppProvider({ children }) {
     }
   }, [buildDateQueryString]);
 
+  const fetchMeetings = useCallback(async () => {
+    try {
+      const res = await fetch('/api/meetings');
+      const data = await res.json();
+      if (data.success && data.meetings) {
+        setMeetings(data.meetings);
+      }
+    } catch (e) {
+      console.warn('Failed to fetch meetings:', e);
+    }
+  }, []);
+
+  const fetchUsers = useCallback(async () => {
+    try {
+      const res = await fetch('/api/users');
+      const data = await res.json();
+      if (data.success && data.users) {
+        setUsers(data.users);
+      }
+    } catch (e) {
+      console.warn('Failed to fetch users:', e);
+    }
+  }, []);
+
   const refreshAllData = useCallback(() => {
     fetchSettings();
     fetchLeads();
@@ -241,8 +284,10 @@ export function AppProvider({ children }) {
     fetchClients();
     fetchDemoLinks();
     fetchSuccessfulClients();
+    fetchMeetings();
+    fetchUsers();
     fetchStats();
-  }, [fetchSettings, fetchLeads, fetchOutreach, fetchClients, fetchDemoLinks, fetchSuccessfulClients, fetchStats]);
+  }, [fetchSettings, fetchLeads, fetchOutreach, fetchClients, fetchDemoLinks, fetchSuccessfulClients, fetchMeetings, fetchUsers, fetchStats]);
 
   useEffect(() => {
     refreshAllData();
@@ -523,6 +568,105 @@ export function AppProvider({ children }) {
     }
   };
 
+  // Authentication
+  const login = async (username, password) => {
+    try {
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password })
+      });
+      const data = await res.json();
+      if (data.success && data.user) {
+        setCurrentUser(data.user);
+        localStorage.setItem('lead_tracker_auth_user', JSON.stringify(data.user));
+        return { success: true, user: data.user };
+      }
+      return { success: false, error: data.error || 'Login failed' };
+    } catch (e) {
+      return { success: false, error: e.message };
+    }
+  };
+
+  const logout = () => {
+    setCurrentUser(null);
+    localStorage.removeItem('lead_tracker_auth_user');
+  };
+
+  // User Management CRUD
+  const saveUser = async (userData) => {
+    const isEdit = !!userData._id;
+    const url = isEdit ? `/api/users/${userData._id}` : '/api/users';
+    const method = isEdit ? 'PUT' : 'POST';
+
+    try {
+      const res = await fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(userData),
+      });
+      const result = await res.json();
+      if (result.success) {
+        await fetchUsers();
+        return { success: true, user: result.user };
+      }
+      return { success: false, error: result.error };
+    } catch (e) {
+      return { success: false, error: e.message };
+    }
+  };
+
+  const removeUser = async (id) => {
+    try {
+      const res = await fetch(`/api/users/${id}`, { method: 'DELETE' });
+      const result = await res.json();
+      if (result.success) {
+        await fetchUsers();
+        return { success: true };
+      }
+      return { success: false, error: result.error };
+    } catch (e) {
+      return { success: false, error: e.message };
+    }
+  };
+
+  // Meetings CRUD
+  const saveMeeting = async (meetingData) => {
+    const isEdit = !!meetingData._id;
+    const url = isEdit ? `/api/meetings/${meetingData._id}` : '/api/meetings';
+    const method = isEdit ? 'PUT' : 'POST';
+
+    try {
+      const res = await fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(meetingData),
+      });
+      const result = await res.json();
+      if (result.success) {
+        await fetchMeetings();
+        return { success: true, meeting: result.meeting };
+      }
+      return { success: false, error: result.error };
+    } catch (e) {
+      return { success: false, error: e.message };
+    }
+  };
+
+  const removeMeeting = async (id) => {
+    try {
+      const res = await fetch(`/api/meetings/${id}`, { method: 'DELETE' });
+      const result = await res.json();
+      if (result.success) {
+        await fetchMeetings();
+        return { success: true };
+      }
+      return { success: false, error: result.error };
+    } catch (e) {
+      return { success: false, error: e.message };
+    }
+  };
+
   // Update Settings
   const saveSettings = async (newSettings) => {
     try {
@@ -610,7 +754,24 @@ export function AppProvider({ children }) {
       item: o
     }));
 
-  const allFollowUpNotices = [...dueFollowUps, ...dueOutreachFollowUps].sort((a, b) => {
+  const dueMeetings = meetings
+    .filter(m => m.meetingDate && m.meetingDate <= todayStr && m.status === 'Scheduled')
+    .map(m => ({
+      _id: m._id,
+      name: `${m.clientName} (Meeting: ${m.title})`,
+      phone: m.phone,
+      service: m.platform,
+      requirements: m.agenda || m.meetingLink || 'Scheduled Call/Meeting',
+      followUpDate: m.meetingDate,
+      followUpTime: m.meetingTime || '11:00 AM',
+      type: `Meeting (${m.platform})`,
+      potentialityStatus: 'Scheduled',
+      isOverdue: m.meetingDate < todayStr,
+      isToday: m.meetingDate === todayStr,
+      item: m
+    }));
+
+  const allFollowUpNotices = [...dueFollowUps, ...dueOutreachFollowUps, ...dueMeetings].sort((a, b) => {
     // Sort overdue first, then date
     if (a.isOverdue && !b.isOverdue) return -1;
     if (!a.isOverdue && b.isOverdue) return 1;
@@ -647,6 +808,25 @@ export function AppProvider({ children }) {
         saveSuccessfulClient,
         importSuccessfulClientsBatch,
         removeSuccessfulClient,
+        // Meetings
+        meetings,
+        fetchMeetings,
+        saveMeeting,
+        removeMeeting,
+        isMeetingModalOpen,
+        setIsMeetingModalOpen,
+        editingMeeting,
+        setEditingMeeting,
+        // Users & Auth
+        users,
+        fetchUsers,
+        saveUser,
+        removeUser,
+        currentUser,
+        login,
+        logout,
+        isAuthModalOpen,
+        setIsAuthModalOpen,
         stats,
         refreshAllData,
         activeTab,
@@ -684,6 +864,7 @@ export function AppProvider({ children }) {
         allFollowUpNotices,
         dueFollowUps,
         dueOutreachFollowUps,
+        dueMeetings,
         totalNoticeCount,
         playNotificationChime,
         convertToClient,

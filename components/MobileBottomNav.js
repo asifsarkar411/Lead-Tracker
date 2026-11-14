@@ -9,7 +9,7 @@ import {
   Briefcase, 
   FolderKanban, 
   Settings,
-  BellRing
+  Calendar
 } from 'lucide-react';
 
 export default function MobileBottomNav() {
@@ -18,8 +18,8 @@ export default function MobileBottomNav() {
     setActiveTab, 
     leads, 
     outreachLeads, 
-    clients, 
-    totalNoticeCount 
+    meetings,
+    clients 
   } = useApp();
 
   const navItems = [
@@ -42,6 +42,12 @@ export default function MobileBottomNav() {
       badge: outreachLeads.length
     },
     {
+      id: 'meetings',
+      label: 'Meetings',
+      icon: Calendar,
+      badge: meetings.length
+    },
+    {
       id: 'clients',
       label: 'Onboard',
       icon: Briefcase,
@@ -51,12 +57,6 @@ export default function MobileBottomNav() {
       id: 'client-list',
       label: 'Clients/Demo',
       icon: FolderKanban,
-      badge: 0
-    },
-    {
-      id: 'admin',
-      label: 'Admin',
-      icon: Settings,
       badge: 0
     }
   ];

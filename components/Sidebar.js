@@ -13,7 +13,8 @@ import {
   ChevronDown,
   ChevronRight,
   Star,
-  Link2
+  Link2,
+  Calendar
 } from 'lucide-react';
 
 export default function Sidebar({ mobileOpen, onCloseMobile }) {
@@ -24,6 +25,7 @@ export default function Sidebar({ mobileOpen, onCloseMobile }) {
     setClientListSubTab, 
     leads, 
     outreachLeads, 
+    meetings,
     clients, 
     demoLinks,
     successfulClients,
@@ -149,7 +151,29 @@ export default function Sidebar({ mobileOpen, onCloseMobile }) {
             </span>
           </button>
 
-          {/* 4. Onboarded Clients (Separate Channel) */}
+          {/* 4. Meetings & Schedule */}
+          <button
+            onClick={() => handleSelectTab('meetings')}
+            className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-left font-semibold text-xs transition-all ${
+              activeTab === 'meetings'
+                ? 'bg-blue-600 text-white shadow-sm'
+                : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800/60'
+            }`}
+          >
+            <div className="flex items-center gap-3">
+              <Calendar className={`w-4 h-4 ${activeTab === 'meetings' ? 'text-white' : 'text-blue-500'}`} />
+              <span>Meetings & Schedule</span>
+            </div>
+            <span className={`px-2 py-0.5 text-[11px] font-bold rounded-full ${
+              activeTab === 'meetings' 
+                ? 'bg-white/20 text-white' 
+                : 'bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-300'
+            }`}>
+              {meetings.length}
+            </span>
+          </button>
+
+          {/* 5. Onboarded Clients (Separate Channel) */}
           <button
             onClick={() => handleSelectTab('clients')}
             className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-left font-semibold text-xs transition-all ${
